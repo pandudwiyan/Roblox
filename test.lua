@@ -1,71 +1,62 @@
---// GUI Teleport ke Stage / Summit
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- Buat GUI
+local function getLeaderstatsValue(statName)
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local stat = leaderstats:FindFirstChild(statName)
+        if stat then
+            return stat.Value
+        end
+    end
+    return nil
+end
+
+-- Buat GUI untuk menampilkan Shelter & Summit
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game.CoreGui
-ScreenGui.Name = "StageTeleportUI"
+ScreenGui.Name = "StageInfoUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 200, 0, 400)
-MainFrame.Position = UDim2.new(0, 20, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(1, -220, 0, 20) -- kanan atas layar
+MainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "Stage Teleport"
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 18
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Parent = MainFrame
+local ShelterLabel = Instance.new("TextLabel")
+ShelterLabel.Size = UDim2.new(1, -10, 0, 40)
+ShelterLabel.Position = UDim2.new(0, 5, 0, 5)
+ShelterLabel.BackgroundTransparency = 1
+ShelterLabel.TextColor3 = Color3.fromRGB(255,255,255)
+ShelterLabel.Font = Enum.Font.SourceSansBold
+ShelterLabel.TextSize = 20
+ShelterLabel.Text = "Shelter: Loading..."
+ShelterLabel.Parent = MainFrame
 
-local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Size = UDim2.new(1, 0, 1, -40)
-ScrollFrame.Position = UDim2.new(0, 0, 0, 40)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.ScrollBarThickness = 6
-ScrollFrame.BackgroundTransparency = 1
-ScrollFrame.Parent = MainFrame
+local SummitLabel = Instance.new("TextLabel")
+SummitLabel.Size = UDim2.new(1, -10, 0, 40)
+SummitLabel.Position = UDim2.new(0, 5, 0, 50)
+SummitLabel.BackgroundTransparency = 1
+SummitLabel.TextColor3 = Color3.fromRGB(255,255,255)
+SummitLabel.Font = Enum.Font.SourceSansBold
+SummitLabel.TextSize = 20
+SummitLabel.Text = "Summit: Loading..."
+SummitLabel.Parent = MainFrame
 
-local UIListLayout = Instance.new("UIListLayout", ScrollFrame)
-UIListLayout.Padding = UDim.new(0, 5)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
--- Cari semua Part yang namanya mengandung "stage", "checkpoint", atau "summit"
-local stages = {}
-for _, obj in ipairs(workspace:GetDescendants()) do
-    if obj:IsA("BasePart") then
-        local name = obj.Name:lower()
-        if name:find("stage") or name:find("checkpoint") or name:find("summit") then
-            table.insert(stages, obj)
-        end
+-- Update nilai setiap 1 detik
+while true do
+    local shelterVal = getLeaderstatsValue("Shelter")
+    local summitVal = getLeaderstatsValue("Summit")
+    if shelterVal then
+        ShelterLabel.Text = "Shelter: " .. tostring(shelterVal)
+    else
+        ShelterLabel.Text = "Shelter: N/A"
     end
+    if summitVal then
+        SummitLabel.Text = "Summit: " .. tostring(summitVal)
+    else
+        SummitLabel.Text = "Summit: N/A"
+    end
+    wait(1)
 end
-
--- Buat tombol untuk setiap lokasi
-for i, stagePart in ipairs(stages) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Text = stagePart.Name
-    btn.Parent = ScrollFrame
-
-    btn.MouseButton1Click:Connect(function()
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char:SetPrimaryPartCFrame(stagePart.CFrame + Vector3.new(0, 3, 0))
-        end
-    end)
-end
-
--- Auto update ukuran scroll
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
-UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
-end)
