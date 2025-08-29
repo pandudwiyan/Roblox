@@ -733,7 +733,7 @@ local function createBlock(char)
 	block.CanCollide = true
 	block.BrickColor = BrickColor.new("Medium stone grey")
 	block.Transparency = 0.9
-	block.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
+	block.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
 	block.Parent = workspace
 	game:GetService("Debris"):AddItem(block, 2)
 end
@@ -758,7 +758,7 @@ local function createLandedBlock(char)
 		special.CanCollide = true
 		special.BrickColor = BrickColor.new("Bright yellow")
 		special.Transparency = 0.9
-		special.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 4, hrp.Position.Z)
+		special.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 1, hrp.Position.Z)
 		special.Parent = workspace
 
 		task.delay(10, function()
