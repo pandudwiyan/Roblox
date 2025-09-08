@@ -802,14 +802,14 @@ end
 -- Fungsi Load Semua Tools
 -- ==========================
 local function loadAllTools()
-    createSpeedTool()
-    createCarpetTool()
-    createLeaderboardTool()
-    createVisionTool()
-    createFreezeTool()
-    createBlockTool()
-    createTowerTool()
-    createReverseTool()
+createFreezeTool()
+createBlockTool()
+createReverseTool()
+createVisionTool()
+createLeaderboardTool()
+createCarpetTool()
+createTowerTool()
+createSpeedTool()    
 end
 
 -- langsung load saat pertama kali script jalan
