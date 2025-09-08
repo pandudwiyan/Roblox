@@ -8,43 +8,6 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- ==========================
--- UI Ransel Button
--- ==========================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RanselGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
-
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 100, 0, 40)
-Frame.Position = UDim2.new(1, -110, 0, 10)
-Frame.BackgroundColor3 = Color3.fromRGB(50,50,50)
-Frame.BorderSizePixel = 0
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
-
-local Button = Instance.new("TextButton")
-Button.Size = UDim2.new(1, -20, 1, 0)
-Button.Position = UDim2.new(0, 0, 0, 0)
-Button.Text = "Ransel"
-Button.BackgroundColor3 = Color3.fromRGB(100, 100, 250)
-Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-Button.Parent = Frame
-
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 20, 0, 20)
-CloseButton.Position = UDim2.new(1, -20, 0, 0)
-CloseButton.Text = "X"
-CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.Parent = Frame
-
-CloseButton.MouseButton1Click:Connect(function()
-    Frame.Visible = false
-end)
-
--- ==========================
 -- Daftar Item
 -- ==========================
 local items = {
@@ -182,21 +145,38 @@ local function createLeaderboardTool()
     Frame.Size = UDim2.new(0, 500, 0, 350)
     Frame.Position = UDim2.new(0.5, -250, 0.5, -175)
     Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    Frame.BackgroundTransparency = 0.2
     Frame.BorderSizePixel = 0
+    Frame.Active = true
+    Frame.Draggable = true
     Frame.Parent = ScreenGui
 
+    -- Rounded corner
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = Frame
+
     local header = Instance.new("Frame")
-    header.Size = UDim2.new(1,0,0,30)
-    header.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    header.Size = UDim2.new(1,0,0,40)
+    header.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    header.BackgroundTransparency = 0.1
     header.Parent = Frame
+
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 10)
+    headerCorner.Parent = header
 
     local function createHeader(text, pos, size)
         local lbl = Instance.new("TextLabel")
         lbl.Size = size
         lbl.Position = pos
         lbl.BackgroundTransparency = 1
-        lbl.TextColor3 = Color3.new(1,1,0)
-        lbl.Font = Enum.Font.SourceSansBold
+        lbl.TextColor3 = Color3.new(1, 1, 1) -- putih sama seperti user list
+        lbl.Font = Enum.Font.SourceSansBold   -- sama dengan user list
+        lbl.TextSize = 15                     -- manual size, biar konsisten
+        lbl.TextScaled = false                -- jangan auto-scale
+        lbl.TextXAlignment = Enum.TextXAlignment.Center -- rata tengah horizontal
+        lbl.TextYAlignment = Enum.TextYAlignment.Center -- rata tengah vertical
         lbl.Text = text
         lbl.Parent = header
     end
@@ -207,8 +187,8 @@ local function createLeaderboardTool()
     createHeader("Teleport", UDim2.new(0.75,0,0,0), UDim2.new(0.25,0,1,0))
 
     local Scrolling = Instance.new("ScrollingFrame")
-    Scrolling.Size = UDim2.new(1,0,1,-30)
-    Scrolling.Position = UDim2.new(0,0,0,30)
+    Scrolling.Size = UDim2.new(1,0,1,-40)
+    Scrolling.Position = UDim2.new(0,0,0,40)
     Scrolling.CanvasSize = UDim2.new(0,0,0,0)
     Scrolling.ScrollBarThickness = 8
     Scrolling.BackgroundTransparency = 1
@@ -263,6 +243,7 @@ local function createLeaderboardTool()
             row.Parent = Scrolling
 
             local nameLabel = Instance.new("TextLabel")
+            nameLabel.Position = UDim2.new(0, 10, 0, 0) -- geser 10px ke kanan
             nameLabel.Size = UDim2.new(0.35,0,1,0)
             nameLabel.BackgroundTransparency = 1
             nameLabel.TextColor3 = Color3.new(1,1,1)
@@ -817,104 +798,25 @@ local function createReverseTool()
     startRecording()
 end
 
-createReverseTool()
-
-
 -- ==========================
--- Fungsi Spawn Parts
+-- Fungsi Load Semua Tools
 -- ==========================
-local function spawnParts()
-    local character = Player.Character or Player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
-
-    -- hapus part lama
-    for _, p in ipairs(spawnedParts) do
-        if p and p.Parent then
-            p:Destroy()
-        end
-    end
-    table.clear(spawnedParts)
-
-    local radius = 10
-    for i, item in ipairs(items) do
-        -- skip kalau tool sudah ada
-        if not (Player.Backpack:FindFirstChild(item.ToolName) or character:FindFirstChild(item.ToolName)) then
-            local angle = math.rad((i-1) * (360 / #items))
-            local offset = Vector3.new(math.cos(angle)*radius,0,math.sin(angle)*radius)
-            local pos = hrp.Position + offset
-
-            -- raycast ke tanah
-            local rayOrigin = pos + Vector3.new(0,50,0)
-            local rayDirection = Vector3.new(0,-100,0)
-            local rayParams = RaycastParams.new()
-            rayParams.FilterDescendantsInstances = {character}
-            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-            local rayResult = workspace:Raycast(rayOrigin, rayDirection, rayParams)
-            local partY = rayResult and rayResult.Position.Y + 0.5 or pos.Y
-
-            local part = Instance.new("Part")
-            part.Size = Vector3.new(2,1,2)
-            part.Position = Vector3.new(pos.X, partY, pos.Z)
-            part.Anchored = true
-            part.CanCollide = false
-            part.Name = item.Name
-            part.Parent = workspace
-
-            -- billboard
-            local billboard = Instance.new("BillboardGui")
-            billboard.Size = UDim2.new(0,120,0,50)
-            billboard.StudsOffset = Vector3.new(0,2,0)
-            billboard.Adornee = part
-            billboard.AlwaysOnTop = true
-            billboard.Parent = part
-
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Size = UDim2.new(1,0,1,0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.Text = item.Name
-            textLabel.TextColor3 = Color3.fromRGB(255,255,255)
-            textLabel.TextScaled = true
-            textLabel.Parent = billboard
-
-            -- disentuh (per part debounce)
-            local debounce = false
-            part.Touched:Connect(function(hit)
-                if debounce then return end
-                local hum = hit.Parent:FindFirstChildOfClass("Humanoid")
-                if hum and hit.Parent == character then
-                    debounce = true
-                    if item.Name == "Speed" then
-                        createSpeedTool()
-                    elseif item.Name == "M. Carpet" then
-                        createCarpetTool()
-                    elseif item.Name == "L. Board" then
-                        createLeaderboardTool()
-                    elseif item.Name == "Vision" then
-                        createVisionTool()
-                    elseif item.Name == "Freeze" then
-                        createFreezeTool()
-                    elseif item.Name == "Block" then
-                        createBlockTool()
-                    elseif item.Name == "Tower" then
-                        createTowerTool()
-                    elseif item.Name == "Reverse" then
-                        createReverseTool()
-                    end
-                    part:Destroy()
-                end
-            end)
-
-            table.insert(spawnedParts, part)
-
-            -- 🔥 Auto-hancur setelah 5 detik kalau belum diambil
-            task.delay(5, function()
-                if part and part.Parent then
-                    part:Destroy()
-                end
-            end)
-        end
-    end
+local function loadAllTools()
+    createSpeedTool()
+    createCarpetTool()
+    createLeaderboardTool()
+    createVisionTool()
+    createFreezeTool()
+    createBlockTool()
+    createTowerTool()
+    createReverseTool()
 end
 
-Button.MouseButton1Click:Connect(spawnParts)
+-- langsung load saat pertama kali script jalan
+loadAllTools()
+
+-- Pastikan setelah respawn tools tetap ada
+Player.CharacterAdded:Connect(function()
+    task.wait(1) -- tunggu karakter selesai spawn
+    loadAllTools()
+end)
