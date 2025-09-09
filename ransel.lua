@@ -8,22 +8,6 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- ==========================
--- Daftar Item
--- ==========================
-local items = {
-    {Name = "Speed", ToolName = "Speed Coil"},
-    {Name = "M. Carpet", ToolName = "M. Carpet"},
-    {Name = "L. Board", ToolName = "L. Board"},
-    {Name = "Vision", ToolName = "Vision"},
-    {Name = "Freeze", ToolName = "Freeze"},
-    { Name = "Block", ToolName = "Block" },
-    { Name = "Tower", ToolName = "Tower" },
-    { Name = "Reverse", ToolName = "Reverse" },
-}
-
-local spawnedParts = {}
-
--- ==========================
 -- TOOL: Speed Coil
 -- ==========================
 local function createSpeedTool()
@@ -60,37 +44,50 @@ local function createCarpetTool()
     local up, down = false, false
     local BV -- BodyVelocity
 
-    -- tombol naik/turun untuk mobile
+    -- GUI untuk mobile (pojok kanan bawah)
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "CarpetGui"
+    screen.ResetOnSpawn = false
+    screen.Parent = PlayerGui
+    screen.Enabled = false -- default mati
+
     local mobileGui = Instance.new("Frame")
-    mobileGui.Size = UDim2.new(0,120,0,120)
-    mobileGui.Position = UDim2.new(1,-130,1,-130)
-    mobileGui.BackgroundTransparency = 1
-    mobileGui.Parent = PlayerGui
+    mobileGui.Size = UDim2.new(0,80,0,80)
+    mobileGui.Position = UDim2.new(1,-100,1,-120) -- pojok kanan bawah
+    mobileGui.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    mobileGui.BackgroundTransparency = 0.4
+    mobileGui.Parent = screen
 
     local upBtn = Instance.new("TextButton")
-    upBtn.Size = UDim2.new(0.5,0,0.5,0)
+    upBtn.Size = UDim2.new(1,0,0.5,0)
     upBtn.Position = UDim2.new(0,0,0,0)
     upBtn.Text = "▲"
-    upBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
+    upBtn.TextSize = 18
+    upBtn.TextColor3 = Color3.new(1,1,1)
+    upBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    upBtn.BackgroundTransparency = 0.2
     upBtn.Parent = mobileGui
 
     local downBtn = Instance.new("TextButton")
-    downBtn.Size = UDim2.new(0.5,0,0.5,0)
-    downBtn.Position = UDim2.new(0.5,0,0.5,0)
+    downBtn.Size = UDim2.new(1,0,0.5,0)
+    downBtn.Position = UDim2.new(0,0,0.5,0)
     downBtn.Text = "▼"
-    downBtn.BackgroundColor3 = Color3.fromRGB(200,0,0)
+    downBtn.TextSize = 18
+    downBtn.TextColor3 = Color3.new(1,1,1)
+    downBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    downBtn.BackgroundTransparency = 0.2
     downBtn.Parent = mobileGui
 
+    -- event tombol
     upBtn.MouseButton1Down:Connect(function() up = true end)
     upBtn.MouseButton1Up:Connect(function() up = false end)
     downBtn.MouseButton1Down:Connect(function() down = true end)
     downBtn.MouseButton1Up:Connect(function() down = false end)
 
-    mobileGui.Visible = false
-
     tool.Equipped:Connect(function()
         flying = true
         mobileGui.Visible = true
+        screen.Enabled = true
 
         local char = Player.Character or Player.CharacterAdded:Wait()
         local hrp = char:WaitForChild("HumanoidRootPart")
@@ -108,10 +105,11 @@ local function createCarpetTool()
                 if hum then
                     moveDir = hum.MoveDirection * 50
                 end
+
                 local yVel = 0
                 if up then yVel = 50 elseif down then yVel = -50 end
 
-                -- keyboard naik turun
+                -- keyboard naik turun (untuk PC)
                 if UIS:IsKeyDown(Enum.KeyCode.Space) then yVel = 50 end
                 if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then yVel = -50 end
 
@@ -123,7 +121,8 @@ local function createCarpetTool()
     tool.Unequipped:Connect(function()
         flying = false
         mobileGui.Visible = false
-        if BV then BV:Destroy() end
+        screen.Enabled = false
+        if BV then BV:Destroy() BV = nil end
     end)
 end
 
@@ -799,17 +798,156 @@ local function createReverseTool()
 end
 
 -- ==========================
+-- TOOL: Pil (Immortal + No Hunger/Energy Drain)
+-- ==========================
+local function createPilTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "Pil"
+    tool.RequiresHandle = false
+    tool.Parent = Player.Backpack
+
+    local hum
+    local connections = {}
+
+    tool.Equipped:Connect(function()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        hum = char:WaitForChild("Humanoid")
+
+        -- Buat kebal Health
+        table.insert(connections, hum.HealthChanged:Connect(function()
+            if hum.Health < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
+        end))
+
+        -- Kalau ada leaderstats Thirst & Energy
+        local stats = Player:FindFirstChild("leaderstats")
+        if stats then
+            local thirst = stats:FindFirstChild("Thirst")
+            local energy = stats:FindFirstChild("Energy")
+
+            if thirst then
+                table.insert(connections, thirst.Changed:Connect(function()
+                    if thirst.Value < 100 then
+                        thirst.Value = 100
+                    end
+                end))
+            end
+
+            if energy then
+                table.insert(connections, energy.Changed:Connect(function()
+                    if energy.Value < 100 then
+                        energy.Value = 100
+                    end
+                end))
+            end
+        end
+    end)
+
+    tool.Unequipped:Connect(function()
+        -- putus semua koneksi
+        for _, c in ipairs(connections) do
+            c:Disconnect()
+        end
+        table.clear(connections)
+
+        -- restore Health
+        if hum then
+            hum.Health = hum.MaxHealth
+        end
+
+        -- restore Thirst & Energy ke 100
+        local stats = Player:FindFirstChild("leaderstats")
+        if stats then
+            if stats:FindFirstChild("Thirst") then
+                stats.Thirst.Value = 100
+            end
+            if stats:FindFirstChild("Energy") then
+                stats.Energy.Value = 100
+            end
+        end
+    end)
+end
+
+-- ==========================
+-- TOOL: Spider (Grapple Hook)
+-- ==========================
+local function createSpiderTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "Spider"
+    tool.RequiresHandle = false
+    tool.Parent = Player.Backpack
+
+    local mouse = Player:GetMouse()
+    local char, hrp
+    local conn
+
+    tool.Equipped:Connect(function()
+        char = Player.Character or Player.CharacterAdded:Wait()
+        hrp = char:WaitForChild("HumanoidRootPart")
+
+        -- aktifkan mode targeting (klik kiri)
+        conn = mouse.Button1Down:Connect(function()
+            if not hrp then return end
+            local targetPos = mouse.Hit and mouse.Hit.Position
+            if not targetPos then return end
+
+            -- buat attachment + rope visual (opsional)
+            local attachment0 = Instance.new("Attachment", hrp)
+            local rope = Instance.new("Beam")
+            rope.Attachment0 = attachment0
+            rope.FaceCamera = true
+            rope.Width0, rope.Width1 = 0.2, 0.2
+            rope.Color = ColorSequence.new(Color3.new(1,1,1))
+            rope.Parent = hrp
+
+            local targetPart = Instance.new("Part")
+            targetPart.Anchored = true
+            targetPart.CanCollide = false
+            targetPart.Transparency = 1
+            targetPart.Position = targetPos
+            targetPart.Parent = workspace
+
+            local attachment1 = Instance.new("Attachment", targetPart)
+            rope.Attachment1 = attachment1
+
+            -- tarik ke arah target (tween biar smooth)
+            local tweenService = game:GetService("TweenService")
+            local distance = (targetPos - hrp.Position).Magnitude
+            local time = math.clamp(distance / 100, 0.3, 2) -- makin jauh makin lama
+
+            local tween = tweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {
+                CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0)) -- sedikit di atas biar tidak nabrak tanah
+            })
+            tween:Play()
+            tween.Completed:Connect(function()
+                rope:Destroy()
+                attachment0:Destroy()
+                targetPart:Destroy()
+            end)
+        end)
+    end)
+
+    tool.Unequipped:Connect(function()
+        if conn then conn:Disconnect() end
+        conn = nil
+    end)
+end
+
+-- ==========================
 -- Fungsi Load Semua Tools
 -- ==========================
 local function loadAllTools()
+createSpeedTool()
 createFreezeTool()
 createBlockTool()
-createReverseTool()
 createVisionTool()
-createLeaderboardTool()
 createCarpetTool()
+createReverseTool()
 createTowerTool()
-createSpeedTool()    
+createPilTool()
+createSpiderTool()
+createLeaderboardTool()
 end
 
 -- langsung load saat pertama kali script jalan
