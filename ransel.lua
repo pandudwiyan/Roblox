@@ -8,7 +8,7 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- ==========================
--- TOOL: Speed Coil
+-- TOOL: Speed Coil (Minimalist UI)
 -- ==========================
 local function createSpeedTool()
     local tool = Instance.new("Tool")
@@ -16,20 +16,76 @@ local function createSpeedTool()
     tool.RequiresHandle = false
     tool.Parent = Player.Backpack
 
-    tool.Equipped:Connect(function()
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+    local humanoid
+    local speed = 25 -- default coil speed
+
+    -- GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "SpeedGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = PlayerGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 50, 0, 100) -- sempit
+    frame.Position = UDim2.new(1, -60, 0.7, 0) -- kanan bawah agak ke tengah
+    frame.BackgroundTransparency = 1 -- transparan full
+    frame.Active = true
+    frame.Draggable = true
+    frame.Visible = false
+    frame.Parent = screenGui
+
+    -- tombol UP
+    local upBtn = Instance.new("TextButton")
+    upBtn.Size = UDim2.new(1, 0, 0.5, 0)
+    upBtn.Position = UDim2.new(0, 0, 0, 0)
+    upBtn.Text = "▲"
+    upBtn.TextColor3 = Color3.new(1, 1, 1)
+    upBtn.BackgroundTransparency = 1
+    upBtn.TextScaled = true
+    upBtn.Parent = frame
+
+    -- tombol DOWN
+    local downBtn = Instance.new("TextButton")
+    downBtn.Size = UDim2.new(1, 0, 0.5, 0)
+    downBtn.Position = UDim2.new(0, 0, 0.5, 0)
+    downBtn.Text = "▼"
+    downBtn.TextColor3 = Color3.new(1, 1, 1)
+    downBtn.BackgroundTransparency = 1
+    downBtn.TextScaled = true
+    downBtn.Parent = frame
+
+    -- fungsi update speed
+    local function updateSpeed(newSpeed)
+        speed = newSpeed
         if humanoid then
-            humanoid.WalkSpeed = 25
+            humanoid.WalkSpeed = speed
         end
+    end
+
+    -- tombol logic
+    upBtn.MouseButton1Click:Connect(function()
+        updateSpeed(speed * 2)
+    end)
+
+    downBtn.MouseButton1Click:Connect(function()
+        updateSpeed(math.max(25, speed / 2)) -- minimal 25
+    end)
+
+    tool.Equipped:Connect(function()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        humanoid = char:WaitForChild("Humanoid")
+        updateSpeed(25) -- reset default
+        frame.Visible = true
     end)
 
     tool.Unequipped:Connect(function()
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            humanoid.WalkSpeed = 16
+            humanoid.WalkSpeed = 16 -- balik ke default game
         end
+        frame.Visible = false
     end)
 end
+
 
 -- ==========================
 -- TOOL: M.Carpet (Fly)
@@ -625,7 +681,6 @@ local function createBlockTool()
     end)
 end
 
-
 -- ==========================
 -- TOOL: Tower (Auto-Grow Truss)
 -- ==========================
@@ -798,7 +853,7 @@ local function createReverseTool()
 end
 
 -- ==========================
--- TOOL: Pil (Immortal + No Hunger/Energy Drain)
+-- TOOL: Pil (Super Regen + Kebal + Efek Visual)
 -- ==========================
 local function createPilTool()
     local tool = Instance.new("Tool")
@@ -807,67 +862,101 @@ local function createPilTool()
     tool.Parent = Player.Backpack
 
     local hum
-    local connections = {}
+    local stats
+    local thirst, energy
+    local active = false
+    local aura -- efek visual
+
+    -- fungsi regen paksa
+    local function regenLoop()
+        while active do
+            if hum then
+                -- Regen Health 50x lebih cepat
+                if hum.Health < hum.MaxHealth then
+                    hum.Health = math.min(hum.MaxHealth, hum.Health + (hum.MaxHealth/50))
+                else
+                    hum.Health = hum.MaxHealth
+                end
+            end
+
+            if thirst then
+                if thirst.Value < 100 then
+                    thirst.Value = math.min(100, thirst.Value + 2)
+                else
+                    thirst.Value = 100
+                end
+            end
+
+            if energy then
+                if energy.Value < 100 then
+                    energy.Value = math.min(100, energy.Value + 2)
+                else
+                    energy.Value = 100
+                end
+            end
+
+            task.wait(0.1) -- 10x per detik
+        end
+    end
+
+    -- bikin efek aura
+    local function createAura(char)
+        if aura then aura:Destroy() end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        aura = Instance.new("ParticleEmitter")
+        aura.Name = "PilAura"
+        aura.Texture = "rbxassetid://241594419" -- glow hijau bulat
+        aura.Color = ColorSequence.new(Color3.fromRGB(0,255,0))
+        aura.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.5),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        aura.Size = NumberSequence.new(1.5)
+        aura.LightEmission = 0.7
+        aura.Rate = 20
+        aura.Lifetime = NumberRange.new(0.5, 1)
+        aura.Speed = NumberRange.new(0,0)
+        aura.Rotation = NumberRange.new(0,360)
+        aura.RotSpeed = NumberRange.new(-30,30)
+        aura.Parent = hrp
+    end
+
+    local function removeAura()
+        if aura then
+            aura:Destroy()
+            aura = nil
+        end
+    end
 
     tool.Equipped:Connect(function()
         local char = Player.Character or Player.CharacterAdded:Wait()
         hum = char:WaitForChild("Humanoid")
 
-        -- Buat kebal Health
-        table.insert(connections, hum.HealthChanged:Connect(function()
-            if hum.Health < hum.MaxHealth then
-                hum.Health = hum.MaxHealth
-            end
-        end))
+        stats = Player:FindFirstChild("leaderstats")
+        thirst = stats and stats:FindFirstChild("Thirst") or nil
+        energy = stats and stats:FindFirstChild("Energy") or nil
 
-        -- Kalau ada leaderstats Thirst & Energy
-        local stats = Player:FindFirstChild("leaderstats")
-        if stats then
-            local thirst = stats:FindFirstChild("Thirst")
-            local energy = stats:FindFirstChild("Energy")
-
-            if thirst then
-                table.insert(connections, thirst.Changed:Connect(function()
-                    if thirst.Value < 100 then
-                        thirst.Value = 100
-                    end
-                end))
-            end
-
-            if energy then
-                table.insert(connections, energy.Changed:Connect(function()
-                    if energy.Value < 100 then
-                        energy.Value = 100
-                    end
-                end))
-            end
-        end
+        active = true
+        task.spawn(regenLoop)
+        createAura(char)
     end)
 
     tool.Unequipped:Connect(function()
-        -- putus semua koneksi
-        for _, c in ipairs(connections) do
-            c:Disconnect()
-        end
-        table.clear(connections)
-
-        -- restore Health
-        if hum then
-            hum.Health = hum.MaxHealth
-        end
-
-        -- restore Thirst & Energy ke 100
-        local stats = Player:FindFirstChild("leaderstats")
-        if stats then
-            if stats:FindFirstChild("Thirst") then
-                stats.Thirst.Value = 100
+        active = false
+        removeAura()
+        task.delay(1, function()
+            if hum then
+                hum.Health = hum.MaxHealth
             end
-            if stats:FindFirstChild("Energy") then
-                stats.Energy.Value = 100
-            end
-        end
+            if thirst then thirst.Value = 100 end
+            if energy then energy.Value = 100 end
+        end)
     end)
 end
+
+
 
 -- ==========================
 -- TOOL: Spider (Grapple Hook)
@@ -935,17 +1024,52 @@ local function createSpiderTool()
 end
 
 -- ==========================
+-- TOOL: Jumper (Teleport)
+-- ==========================
+local function createJumperTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "Jumper"
+    tool.RequiresHandle = false
+    tool.Parent = Player.Backpack
+
+    local mouse = Player:GetMouse()
+    local char, hrp
+    local conn
+
+    tool.Equipped:Connect(function()
+        char = Player.Character or Player.CharacterAdded:Wait()
+        hrp = char:WaitForChild("HumanoidRootPart")
+
+        -- aktifkan mode targeting (klik kiri)
+        conn = mouse.Button1Down:Connect(function()
+            if not hrp then return end
+            local targetPos = mouse.Hit and mouse.Hit.Position
+            if not targetPos then return end
+
+            -- teleport langsung 5 stud di atas target
+            hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+        end)
+    end)
+
+    tool.Unequipped:Connect(function()
+        if conn then conn:Disconnect() end
+        conn = nil
+    end)
+end
+
+-- ==========================
 -- Fungsi Load Semua Tools
 -- ==========================
 local function loadAllTools()
 createSpeedTool()
+createJumperTool()
 createFreezeTool()
 createBlockTool()
 createVisionTool()
-createCarpetTool()
 createReverseTool()
 createTowerTool()
 createPilTool()
+createCarpetTool()
 createSpiderTool()
 createLeaderboardTool()
 end
