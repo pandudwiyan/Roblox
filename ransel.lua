@@ -853,7 +853,7 @@ local function createReverseTool()
 end
 
 -- ==========================
--- TOOL: Pil (Super Regen + Kebal + Efek Visual)
+-- TOOL: Pil (Regen + Kebal saat aktif)
 -- ==========================
 local function createPilTool()
     local tool = Instance.new("Tool")
@@ -865,41 +865,30 @@ local function createPilTool()
     local stats
     local thirst, energy
     local active = false
-    local aura -- efek visual
+    local aura
+    local healthConn
 
-    -- fungsi regen paksa
+    -- fungsi regen pintar
     local function regenLoop()
-        while active do
-            if hum then
-                -- Regen Health 50x lebih cepat
-                if hum.Health < hum.MaxHealth then
-                    hum.Health = math.min(hum.MaxHealth, hum.Health + (hum.MaxHealth/50))
-                else
-                    hum.Health = hum.MaxHealth
-                end
+        while active and hum do
+            -- regen cepat (hanya sampai full)
+            if hum.Health < hum.MaxHealth then
+                hum.Health = math.min(hum.MaxHealth, hum.Health + (hum.MaxHealth / 40))
             end
 
-            if thirst then
-                if thirst.Value < 100 then
-                    thirst.Value = math.min(100, thirst.Value + 2)
-                else
-                    thirst.Value = 100
-                end
+            -- leaderstats bonus
+            if thirst and thirst.Value < 100 then
+                thirst.Value = math.min(100, thirst.Value + 2)
+            end
+            if energy and energy.Value < 100 then
+                energy.Value = math.min(100, energy.Value + 2)
             end
 
-            if energy then
-                if energy.Value < 100 then
-                    energy.Value = math.min(100, energy.Value + 2)
-                else
-                    energy.Value = 100
-                end
-            end
-
-            task.wait(0.1) -- 10x per detik
+            task.wait(0.1)
         end
     end
 
-    -- bikin efek aura
+    -- efek aura hijau
     local function createAura(char)
         if aura then aura:Destroy() end
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -907,7 +896,7 @@ local function createPilTool()
 
         aura = Instance.new("ParticleEmitter")
         aura.Name = "PilAura"
-        aura.Texture = "rbxassetid://241594419" -- glow hijau bulat
+        aura.Texture = "rbxassetid://241594419"
         aura.Color = ColorSequence.new(Color3.fromRGB(0,255,0))
         aura.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.5),
@@ -941,22 +930,32 @@ local function createPilTool()
         active = true
         task.spawn(regenLoop)
         createAura(char)
+
+        -- aktifkan kebal: kalau health turun, langsung balikin
+        healthConn = hum.HealthChanged:Connect(function(hp)
+            if active and hp < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
+        end)
     end)
 
     tool.Unequipped:Connect(function()
         active = false
         removeAura()
-        task.delay(1, function()
-            if hum then
-                hum.Health = hum.MaxHealth
-            end
-            if thirst then thirst.Value = 100 end
-            if energy then energy.Value = 100 end
-        end)
+
+        if healthConn then
+            healthConn:Disconnect()
+            healthConn = nil
+        end
+
+        -- reset normal (tapi tetap isi penuh)
+        if hum then
+            hum.Health = hum.MaxHealth
+        end
+        if thirst then thirst.Value = 100 end
+        if energy then energy.Value = 100 end
     end)
 end
-
-
 
 -- ==========================
 -- TOOL: Spider (Grapple Hook)
@@ -1058,9 +1057,80 @@ local function createJumperTool()
 end
 
 -- ==========================
+-- TOOL: Pro J (Parabola Jump)
+-- ==========================
+local function createProJTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "Pro J"
+    tool.RequiresHandle = false
+    tool.Parent = Player.Backpack
+
+    local mouse = Player:GetMouse()
+    local conn
+
+    tool.Equipped:Connect(function()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        local hum = char:WaitForChild("Humanoid")
+
+        conn = mouse.Button1Down:Connect(function()
+            if not hrp then return end
+            local targetPos = mouse.Hit and mouse.Hit.Position
+            if not targetPos then return end
+
+            -- hitung jarak & durasi
+            local distance = (targetPos - hrp.Position).Magnitude
+            local duration = math.clamp(distance / 60, 0.6, 2)
+
+            -- ketinggian loncat
+            local peakHeight = math.max(8, distance / 3)
+
+            local startPos = hrp.Position
+            local endPos = targetPos + Vector3.new(0, 3, 0) -- landing di atas tanah
+
+            -- rotasi: hadap ke target
+            local lookDir = (Vector3.new(endPos.X, startPos.Y, endPos.Z) - startPos).Unit
+
+            hum.AutoRotate = false -- biar rotasi konsisten ke depan
+            hrp.CFrame = CFrame.new(startPos, startPos + lookDir)
+
+            -- jalankan parabola frame by frame
+            local startTime = tick()
+            local heartbeat = game:GetService("RunService").Heartbeat
+            task.spawn(function()
+                while true do
+                    local t = (tick() - startTime) / duration
+                    if t > 1 then break end
+
+                    -- interpolasi linear XZ
+                    local pos = startPos:Lerp(endPos, t)
+                    -- tambahkan parabola di Y
+                    local height = -4 * peakHeight * (t - 0.5)^2 + peakHeight
+                    pos = Vector3.new(pos.X, pos.Y + height, pos.Z)
+
+                    hrp.CFrame = CFrame.new(pos, pos + lookDir)
+                    heartbeat:Wait()
+                end
+
+                -- set posisi akhir fix
+                hrp.CFrame = CFrame.new(endPos, endPos + lookDir)
+                hum.AutoRotate = true
+            end)
+        end)
+    end)
+
+    tool.Unequipped:Connect(function()
+        if conn then conn:Disconnect() end
+        conn = nil
+    end)
+end
+
+
+-- ==========================
 -- Fungsi Load Semua Tools
 -- ==========================
 local function loadAllTools()
+createProJTool()
 createSpeedTool()
 createJumperTool()
 createFreezeTool()
