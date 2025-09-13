@@ -499,13 +499,14 @@ local function scanPlayers(keyword)
 		createButton(btnContainer, "Line", Color3.fromRGB(70,70,120))
 		createButton(btnContainer, "Bring", Color3.fromRGB(200,120,50))
 
-		-- baru sambungkan semua button yang sudah dibuat
+		-- sambungkan semua button
 		for _, child in ipairs(btnContainer:GetChildren()) do
 			if child:IsA("TextButton") then
-				hookButtonLogic(child, child.Text, plr)
+				-- gunakan Character kalau ada, fallback ke Player
+				local target = plr.Character or plr
+				hookButtonLogic(child, child.Text, target)
 			end
 		end
-
 	end
 
 	-- Atur CanvasSize sesuai jumlah item
@@ -519,7 +520,6 @@ local function scanPlayers(keyword)
 	resultsFrame.ScrollBarThickness = 6
 	resultsFrame.ScrollBarImageColor3 = Color3.fromRGB(180,180,180)
 end
-
 
 -- ==========================
 -- Search button
