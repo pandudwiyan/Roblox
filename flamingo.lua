@@ -872,7 +872,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 -- ==================================
--- [PRO] Highlight + Jump Mode + Kebal
+-- [PRO] Highlight + Jump Mode + Kebal (2x klik)
 -- ==================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -882,6 +882,8 @@ local mouse = LocalPlayer:GetMouse()
 local proActive = false
 local proConn = {}
 local activeHighlight = nil
+local selectedPart = nil
+local selectedPos = nil
 
 -- helper: parabola jump ke targetPos
 local function jumpTo(targetPos)
@@ -924,6 +926,30 @@ local function getMouseTarget()
 	return nil, nil
 end
 
+-- ganti highlight ke part baru
+local function setHighlight(part)
+	if activeHighlight then
+		activeHighlight:Destroy()
+		activeHighlight = nil
+	end
+	selectedPart = nil
+	selectedPos = nil
+
+	if part and part:IsA("BasePart") then
+		local hl = Instance.new("Highlight")
+		hl.Adornee = part
+		hl.FillColor = Color3.fromRGB(0, 170, 255) -- biru
+		hl.FillTransparency = 0.6
+		hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+		hl.OutlineTransparency = 0
+		hl.Parent = part
+		activeHighlight = hl
+
+		selectedPart = part
+		selectedPos = part.Position
+	end
+end
+
 -- toggle PRO mode
 function togglePRO()
 	-- matikan semua koneksi lama
@@ -936,6 +962,7 @@ function togglePRO()
 		activeHighlight:Destroy()
 		activeHighlight = nil
 	end
+	selectedPart, selectedPos = nil, nil
 
 	-- hapus forcefield lama kalau ada
 	local char = LocalPlayer.Character
@@ -955,32 +982,22 @@ function togglePRO()
 		ff.Parent = char
 	end
 
-	-- aktifkan mode PRO
-	table.insert(proConn, RunService.RenderStepped:Connect(function()
-		local part, _ = getMouseTarget()
-		if part and part:IsA("BasePart") then -- cuma highlight BasePart
-			if not activeHighlight or activeHighlight.Adornee ~= part then
-				if activeHighlight then activeHighlight:Destroy() end
-				local hl = Instance.new("Highlight")
-				hl.Adornee = part
-				hl.FillColor = Color3.fromRGB(0, 170, 255) -- biru
-				hl.FillTransparency = 0.6
-				hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-				hl.OutlineTransparency = 0
-				hl.Parent = part
-				activeHighlight = hl
-			end
-		else
-			if activeHighlight then
-				activeHighlight:Destroy()
-				activeHighlight = nil
-			end
-		end
-	end))
-
+	-- klik logic (2 tahap)
 	table.insert(proConn, mouse.Button1Down:Connect(function()
-		local _, pos = getMouseTarget()
-		if pos then jumpTo(pos) end
+		local part, pos = getMouseTarget()
+		if not part then return end
+
+		if selectedPart and part == selectedPart then
+			-- klik kedua di part yg sama -> lompat
+			jumpTo(pos)
+			-- reset selection biar bisa pilih ulang
+			if activeHighlight then activeHighlight:Destroy() end
+			activeHighlight = nil
+			selectedPart, selectedPos = nil, nil
+		else
+			-- klik pertama atau klik beda part -> ganti highlight
+			setHighlight(part)
+		end
 	end))
 
 	return true
@@ -995,7 +1012,6 @@ buttonObjects["PRO"].MouseButton1Click:Connect(function()
 		buttonObjects["PRO"].BackgroundColor3 = Color3.fromRGB(50,50,50) -- abu off
 	end
 end)
-
 
 -- ==================================
 -- [BLCK] Auto-block generator (toggle)
@@ -1800,3 +1816,4 @@ buttonObjects["GHOST"].MouseButton1Click:Connect(function()
 	buttonObjects["GHOST"].BackgroundColor3 =
 		active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
 end)
+
