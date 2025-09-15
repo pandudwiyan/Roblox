@@ -950,9 +950,8 @@ local function setHighlight(part)
 	end
 end
 
--- toggle PRO mode
-function togglePRO()
-	-- matikan semua koneksi lama
+-- matikan PRO secara paksa
+local function disablePRO()
 	for _, c in ipairs(proConn) do
 		c:Disconnect()
 	end
@@ -964,18 +963,26 @@ function togglePRO()
 	end
 	selectedPart, selectedPos = nil, nil
 
-	-- hapus forcefield lama kalau ada
 	local char = LocalPlayer.Character
 	if char and char:FindFirstChild("PRO_ForceField") then
 		char.PRO_ForceField:Destroy()
 	end
 
-	proActive = not proActive
-	if not proActive then
+	proActive = false
+end
+
+-- toggle PRO mode
+function togglePRO()
+	-- kalau lagi aktif, matikan dulu
+	if proActive then
+		disablePRO()
 		return false
 	end
 
+	proActive = true
+
 	-- kasih ForceField biar kebal
+	local char = LocalPlayer.Character
 	if char then
 		local ff = Instance.new("ForceField")
 		ff.Name = "PRO_ForceField"
@@ -1002,6 +1009,15 @@ function togglePRO()
 
 	return true
 end
+
+-- ============ Tambahan: Auto disable ketika respawn ============
+LocalPlayer.CharacterAdded:Connect(function()
+	if proActive then
+		disablePRO()
+		buttonObjects["PRO"].BackgroundColor3 = Color3.fromRGB(50,50,50) -- abu off
+	end
+end)
+
 
 -- tombol header PRO
 buttonObjects["PRO"].MouseButton1Click:Connect(function()
@@ -1442,110 +1458,59 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Regen + Kebal Mode (toggle via button)
+-- [PIL] Respawn di Titik Terakhir Berdiri
 -- ==================================
 local pilActive = false
-local pilAura
 local pilConn
-local regenThread
+local standConn
+local lastStandPos = nil
 
-local function createAura(char)
-	if pilAura then pilAura:Destroy() end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+-- pantau posisi berdiri
+local function trackStanding(char)
+	if standConn then standConn:Disconnect() end
+	local hum = char:WaitForChild("Humanoid")
+	local hrp = char:WaitForChild("HumanoidRootPart")
 
-	pilAura = Instance.new("ParticleEmitter")
-	pilAura.Name = "PilAura"
-	pilAura.Texture = "rbxassetid://241594419"
-	pilAura.Color = ColorSequence.new(Color3.fromRGB(0,255,0))
-	pilAura.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.5),
-		NumberSequenceKeypoint.new(1, 1)
-	})
-	pilAura.Size = NumberSequence.new(1.5)
-	pilAura.LightEmission = 0.7
-	pilAura.Rate = 20
-	pilAura.Lifetime = NumberRange.new(0.5, 1)
-	pilAura.Speed = NumberRange.new(0,0)
-	pilAura.Rotation = NumberRange.new(0,360)
-	pilAura.RotSpeed = NumberRange.new(-30,30)
-	pilAura.Parent = hrp
+	standConn = game:GetService("RunService").Heartbeat:Connect(function()
+		if pilActive and hum.FloorMaterial ~= Enum.Material.Air then
+			-- update titik berdiri terakhir
+			lastStandPos = hrp.Position
+		end
+	end)
 end
 
-local function removeAura()
-	if pilAura then
-		pilAura:Destroy()
-		pilAura = nil
-	end
-end
+-- kalau respawn, teleport balik
+local function onRespawn(char)
+	if not pilActive or not lastStandPos then return end
 
-local function regenLoop(hum, thirst, energy)
-	while pilActive and hum do
-		-- regen cepat (hanya sampai full)
-		if hum.Health < hum.MaxHealth then
-			hum.Health = math.min(hum.MaxHealth, hum.Health + (hum.MaxHealth / 40))
-		end
-
-		-- leaderstats bonus
-		if thirst and thirst.Value < 100 then
-			thirst.Value = math.min(100, thirst.Value + 2)
-		end
-		if energy and energy.Value < 100 then
-			energy.Value = math.min(100, energy.Value + 2)
-		end
-
+	local hrp = char:WaitForChild("HumanoidRootPart")
+	task.defer(function()
+		-- tunggu humanoid ready
+		local hum = char:WaitForChild("Humanoid")
+		hum:ChangeState(Enum.HumanoidStateType.Physics)
+		hrp.CFrame = CFrame.new(lastStandPos + Vector3.new(0, 5, 0)) -- spawn sedikit di atas tanah
 		task.wait(0.1)
-	end
+		hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end)
 end
 
 function togglePIL()
 	if pilActive then
 		-- OFF
 		pilActive = false
-		removeAura()
-
-		if pilConn then
-			pilConn:Disconnect()
-			pilConn = nil
-		end
-
-		-- isi penuh lagi
-		local char = LocalPlayer.Character
-		if char then
-			local hum = char:FindFirstChildOfClass("Humanoid")
-			if hum then
-				hum.Health = hum.MaxHealth
-			end
-		end
-		local stats = LocalPlayer:FindFirstChild("leaderstats")
-		if stats then
-			local thirst = stats:FindFirstChild("Thirst")
-			local energy = stats:FindFirstChild("Energy")
-			if thirst then thirst.Value = 100 end
-			if energy then energy.Value = 100 end
-		end
-
+		lastStandPos = nil
+		if pilConn then pilConn:Disconnect() pilConn = nil end
+		if standConn then standConn:Disconnect() standConn = nil end
 		return false
 	else
 		-- ON
 		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hum = char:WaitForChild("Humanoid")
+		trackStanding(char)
 
-		local stats = LocalPlayer:FindFirstChild("leaderstats")
-		local thirst = stats and stats:FindFirstChild("Thirst") or nil
-		local energy = stats and stats:FindFirstChild("Energy") or nil
+		-- kalau respawn, teleport ke titik berdiri terakhir
+		pilConn = LocalPlayer.CharacterAdded:Connect(onRespawn)
 
 		pilActive = true
-		task.spawn(function() regenLoop(hum, thirst, energy) end)
-		createAura(char)
-
-		-- kebal: kalau health turun, langsung balikin
-		pilConn = hum.HealthChanged:Connect(function(hp)
-			if pilActive and hp < hum.MaxHealth then
-				hum.Health = hum.MaxHealth
-			end
-		end)
-
 		return true
 	end
 end
@@ -1816,4 +1781,3 @@ buttonObjects["GHOST"].MouseButton1Click:Connect(function()
 	buttonObjects["GHOST"].BackgroundColor3 =
 		active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
 end)
-
