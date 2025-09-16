@@ -621,12 +621,12 @@ local function spawnFlag(name)
 	flag.Parent = workspace
 end
 
--- Event untuk button FLAG
 flagBtn.MouseButton1Click:Connect(function()
 	local text = inputBox.Text
-	if text ~= "" then
-		spawnFlag(text)
+	if text == "" then
+		text = "Teleport"
 	end
+	spawnFlag(text)
 end)
 
 --13 September
