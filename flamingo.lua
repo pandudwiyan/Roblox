@@ -1062,7 +1062,7 @@ local function createBlock(char)
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 	local block = Instance.new("Part")
-	block.Size = Vector3.new(10, 0.1, 10)
+	block.Size = Vector3.new(5, 0.1, 5)
 	block.Anchored = true
 	block.CanCollide = true
 	block.BrickColor = BrickColor.new("Medium stone grey")
@@ -1105,7 +1105,7 @@ local function createLandedBlock(char)
 	else
 		landedBlockActive = true
 		local block = Instance.new("Part")
-		block.Size = Vector3.new(10, 0.1, 10)
+		block.Size = Vector3.new(5, 0.1, 5)
 		block.Anchored = true
 		block.CanCollide = true
 		block.BrickColor = BrickColor.new("Bright yellow")
