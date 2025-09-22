@@ -120,7 +120,7 @@ flagCorner.CornerRadius = UDim.new(0, 4)
 flagCorner.Parent = flagBtn
 
 -- Label bawah
-local labels = {"Workspace:", "Players:", "Workspace:_flag", "cp", "inspect:off", "close list"} 
+local labels = {"Workspace:", "Players:", "Workspace:_flag", "cp", "inspect:off", "history"} 
 
 -- counter untuk cp
 local cpCounter = 0
@@ -1458,72 +1458,63 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Mimikri Avatar Terdekat
+-- [PIL] Invisible oleh NPC + Transparan 0.9
 -- ==================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- simpan default avatar
-local defaultDescription = nil
 local pilActive = false
+local savedStates = {} -- simpan properti asli
 
--- cari player terdekat di depan kita
-local function getNearestPlayer()
-    local nearest, dist = nil, math.huge
-    local myChar = LocalPlayer.Character
-    if not myChar then return nil end
-    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local d = (plr.Character.HumanoidRootPart.Position - myRoot.Position).Magnitude
-            if d < dist then
-                dist = d
-                nearest = plr
-            end
-        end
-    end
-    return nearest
+local function setInvisible(char, state)
+	if not char then return end
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") or part:IsA("Decal") then
+			if state then
+				-- simpan state asli sekali saja
+				if not savedStates[part] then
+					savedStates[part] = {
+						Transparency = part.Transparency,
+						CanCollide = part.CanCollide
+					}
+				end
+				part.Transparency = 0.9
+				part.CanCollide = false -- supaya NPC gak bisa deteksi collision
+			else
+				-- balikin
+				local s = savedStates[part]
+				if s then
+					part.Transparency = s.Transparency
+					part.CanCollide = s.CanCollide
+				end
+			end
+		end
+	end
+	if not state then
+		savedStates = {}
+	end
 end
 
--- fungsi toggle mimikri
 local function togglePIL()
-    local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local myHum = myChar:FindFirstChildOfClass("Humanoid")
-    if not myHum then return false end
-
-    if pilActive then
-        -- OFF → balikin ke default
-        pilActive = false
-        if defaultDescription then
-            myHum:ApplyDescription(defaultDescription)
-        end
-        return false
-    else
-        -- ON → copy nearest
-        pilActive = true
-        if not defaultDescription then
-            defaultDescription = myHum:GetAppliedDescription()
-        end
-
-        local target = getNearestPlayer()
-        if target and target.Character then
-            local hum = target.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                local desc = hum:GetAppliedDescription()
-                myHum:ApplyDescription(desc)
-            end
-        end
-        return true
-    end
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	if pilActive then
+		-- OFF
+		pilActive = false
+		setInvisible(char, false)
+		return false
+	else
+		-- ON
+		pilActive = true
+		setInvisible(char, true)
+		return true
+	end
 end
 
 -- hubungkan ke button header PIL
 buttonObjects["PIL"].MouseButton1Click:Connect(function()
-    local active = togglePIL()
-    buttonObjects["PIL"].BackgroundColor3 =
-        active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
+	local active = togglePIL()
+	buttonObjects["PIL"].BackgroundColor3 =
+		active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
 end)
 
 -- ==================================
@@ -1785,3 +1776,110 @@ buttonObjects["GHOST"].MouseButton1Click:Connect(function()
 	buttonObjects["GHOST"].BackgroundColor3 =
 		active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
 end)
+
+-- ==========================
+-- HISTORY FEATURE
+-- ==========================
+local historyList = {}
+
+-- fungsi tambah ke history (recent di atas, tanpa duplikat)
+local function addHistory(text)
+	if text == "" then return end
+	-- hapus kalau sudah ada
+	for i, v in ipairs(historyList) do
+		if v == text then
+			table.remove(historyList, i)
+			break
+		end
+	end
+	-- masukkan ke paling depan (atas)
+	table.insert(historyList, 1, text)
+end
+
+-- fungsi tampilkan history
+local function showHistory()
+	resultsFrame.Visible = true
+	resultsFrame:ClearAllChildren()
+
+	local itemHeight = 22
+	local padding = 2
+	local maxVisible = 10
+	local totalItems = #historyList
+
+	for i, entry in ipairs(historyList) do
+		local itemFrame = Instance.new("Frame")
+		itemFrame.Size = UDim2.new(1, -5, 0, itemHeight)
+		itemFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+		itemFrame.BorderSizePixel = 1
+		itemFrame.BorderColor3 = Color3.fromRGB(80,80,80)
+		itemFrame.Position = UDim2.new(0, 0, 0, (i-1)*(itemHeight + padding))
+		itemFrame.Parent = resultsFrame
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+		nameLabel.Font = Enum.Font.SourceSans
+		nameLabel.TextSize = 14
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		nameLabel.Text = entry
+		nameLabel.Parent = itemFrame
+
+		local selectBtn = Instance.new("TextButton")
+		selectBtn.Size = UDim2.new(0.3, -4, 1, -4)
+		selectBtn.Position = UDim2.new(0.7, 2, 0, 2)
+		selectBtn.BackgroundColor3 = Color3.fromRGB(70,120,70)
+		selectBtn.Text = "Select"
+		selectBtn.TextColor3 = Color3.fromRGB(255,255,255)
+		selectBtn.Font = Enum.Font.SourceSansBold
+		selectBtn.TextSize = 12
+		selectBtn.Parent = itemFrame
+
+		selectBtn.MouseButton1Click:Connect(function()
+			inputBox.Text = entry
+		end)
+	end
+
+	resultsFrame.CanvasSize = UDim2.new(0, 0, 0, totalItems * (itemHeight + padding))
+	local visibleCount = math.min(totalItems, maxVisible)
+	resultsFrame.Size = UDim2.new(1, 0, 0, visibleCount * (itemHeight + padding))
+	resultsFrame.ScrollBarThickness = 6
+	resultsFrame.ScrollBarImageColor3 = Color3.fromRGB(180,180,180)
+end
+
+-- ==========================
+-- Integrasi ke button
+-- ==========================
+searchBtn.MouseButton1Click:Connect(function()
+	local query = inputBox.Text
+	addHistory(query) -- simpan ke history
+	-- existing logic search
+	local base, keyword = string.match(query, "^(.-):(.*)$")
+	if base == "Workspace" then
+		scanWorkspace(keyword)
+	elseif base == "Players" then
+		scanPlayers(keyword)
+	else
+		resultsFrame.Visible = false
+	end
+end)
+
+flagBtn.MouseButton1Click:Connect(function()
+	local text = inputBox.Text
+	if text == "" then
+		text = "Teleport"
+	end
+	addHistory(text) -- simpan ke history
+	spawnFlag(text)
+end)
+
+-- ==========================
+-- Integrasi ke label "history"
+-- ==========================
+for _, child in ipairs(content:GetChildren()) do
+	if child:IsA("TextButton") and child.Text == "history" then
+		child.MouseButton1Click:Connect(function()
+			showHistory()
+		end)
+	end
+end
