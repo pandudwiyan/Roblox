@@ -1458,59 +1458,87 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Respawn di Titik Terakhir Berdiri
+-- [PIL] Copy & Restore Emote Wheel
 -- ==================================
 local pilActive = false
-local pilConn
-local standConn
-local lastStandPos = nil
+local defaultEmotes = nil -- simpan emote original kita
 
--- pantau posisi berdiri
-local function trackStanding(char)
-	if standConn then standConn:Disconnect() end
-	local hum = char:WaitForChild("Humanoid")
-	local hrp = char:WaitForChild("HumanoidRootPart")
+-- cari player terdekat di depan kita
+local function getNearestPlayer()
+	local myChar = LocalPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+	local myPos = myChar.HumanoidRootPart.Position
+	local myLook = myChar.HumanoidRootPart.CFrame.LookVector
 
-	standConn = game:GetService("RunService").Heartbeat:Connect(function()
-		if pilActive and hum.FloorMaterial ~= Enum.Material.Air then
-			-- update titik berdiri terakhir
-			lastStandPos = hrp.Position
+	local nearest, nearestDist = nil, math.huge
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = plr.Character.HumanoidRootPart
+			local dir = (hrp.Position - myPos).Unit
+			local dot = myLook:Dot(dir)
+			if dot > 0.3 then
+				local dist = (hrp.Position - myPos).Magnitude
+				if dist < nearestDist then
+					nearestDist = dist
+					nearest = plr
+				end
+			end
 		end
-	end)
+	end
+	return nearest
 end
 
--- kalau respawn, teleport balik
-local function onRespawn(char)
-	if not pilActive or not lastStandPos then return end
+-- copy semua emote wheel dari target
+local function copyEmoteWheel(target)
+	if not target then return end
 
-	local hrp = char:WaitForChild("HumanoidRootPart")
-	task.defer(function()
-		-- tunggu humanoid ready
-		local hum = char:WaitForChild("Humanoid")
-		hum:ChangeState(Enum.HumanoidStateType.Physics)
-		hrp.CFrame = CFrame.new(lastStandPos + Vector3.new(0, 5, 0)) -- spawn sedikit di atas tanah
-		task.wait(0.1)
-		hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-	end)
+	local desc = Players:GetHumanoidDescriptionFromUserId(target.UserId)
+	if desc and desc.Emotes then
+		local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if myHum then
+			-- simpan default emotes sekali saja
+			if not defaultEmotes then
+				local myDesc = myHum:GetAppliedDescription()
+				defaultEmotes = myDesc.Emotes
+			end
+
+			local myDesc = myHum:GetAppliedDescription()
+			myDesc.Emotes = desc.Emotes
+			myHum:ApplyDescription(myDesc)
+			print("✅ Emote wheel diganti dari:", target.Name)
+		end
+	end
 end
 
+-- restore ke default
+local function restoreDefaultEmotes()
+	local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+	if myHum and defaultEmotes then
+		local myDesc = myHum:GetAppliedDescription()
+		myDesc.Emotes = defaultEmotes
+		myHum:ApplyDescription(myDesc)
+		print("🔄 Emote wheel dikembalikan ke default")
+	end
+end
+
+-- toggle
 function togglePIL()
 	if pilActive then
 		-- OFF
 		pilActive = false
-		lastStandPos = nil
-		if pilConn then pilConn:Disconnect() pilConn = nil end
-		if standConn then standConn:Disconnect() standConn = nil end
+		restoreDefaultEmotes()
 		return false
 	else
 		-- ON
-		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		trackStanding(char)
-
-		-- kalau respawn, teleport ke titik berdiri terakhir
-		pilConn = LocalPlayer.CharacterAdded:Connect(onRespawn)
-
 		pilActive = true
+
+		local target = getNearestPlayer()
+		if target then
+			copyEmoteWheel(target)
+		else
+			warn("❌ Tidak ada player di depan untuk dicopy")
+		end
+
 		return true
 	end
 end
