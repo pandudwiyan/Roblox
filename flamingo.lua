@@ -1458,110 +1458,68 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Copy & Restore Emote Wheel
+-- [PIL] Mimikri Avatar Terdekat
 -- ==================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- simpan default avatar
+local defaultDescription = nil
 local pilActive = false
-local defaultEmotes = nil -- simpan emote original kita
 
 -- cari player terdekat di depan kita
 local function getNearestPlayer()
+    local nearest, dist = nil, math.huge
     local myChar = LocalPlayer.Character
-    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
-    local myPos = myChar.HumanoidRootPart.Position
-    local myLook = myChar.HumanoidRootPart.CFrame.LookVector
+    if not myChar then return nil end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
 
-    local nearest, nearestDist = nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = plr.Character.HumanoidRootPart
-            local dir = (hrp.Position - myPos).Unit
-            local dot = myLook:Dot(dir)
-            if dot > 0.3 then
-                local dist = (hrp.Position - myPos).Magnitude
-                if dist < nearestDist then
-                    nearestDist = dist
-                    nearest = plr
-                end
+            local d = (plr.Character.HumanoidRootPart.Position - myRoot.Position).Magnitude
+            if d < dist then
+                dist = d
+                nearest = plr
             end
         end
     end
     return nearest
 end
 
--- copy semua emote wheel dari target
-local function copyEmoteWheel(target)
-    if not target then
-        inputBox.Text = "❌ Tidak ada player di depan!"
-        return
-    end
+-- fungsi toggle mimikri
+local function togglePIL()
+    local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local myHum = myChar:FindFirstChildOfClass("Humanoid")
+    if not myHum then return false end
 
-    local success, desc = pcall(function()
-        return Players:GetHumanoidDescriptionFromUserId(target.UserId)
-    end)
-
-    if not success or not desc then
-        inputBox.Text = "⚠️ Gagal ambil desc dari " .. target.Name
-        return
-    end
-
-    if desc.Emotes then
-        local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if myHum then
-            -- simpan default emotes sekali saja
-            if not defaultEmotes then
-                local myDesc = myHum:GetAppliedDescription()
-                defaultEmotes = myDesc.Emotes
-            end
-
-            local myDesc = myHum:GetAppliedDescription()
-            myDesc.Emotes = desc.Emotes
-            myHum:ApplyDescription(myDesc)
-
-            inputBox.Text = "✅ Emote dicopy dari " .. target.Name
-        else
-            inputBox.Text = "⚠️ Humanoid kita tidak ditemukan!"
-        end
-    else
-        inputBox.Text = "⚠️ Player " .. target.Name .. " tidak punya emotes!"
-    end
-end
-
--- restore ke default
-local function restoreDefaultEmotes()
-    local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if myHum and defaultEmotes then
-        local myDesc = myHum:GetAppliedDescription()
-        myDesc.Emotes = defaultEmotes
-        myHum:ApplyDescription(myDesc)
-        inputBox.Text = "🔄 Emote dikembalikan ke default"
-    else
-        inputBox.Text = "⚠️ Default emote tidak tersimpan!"
-    end
-end
-
--- toggle
-function togglePIL()
     if pilActive then
-        -- OFF
+        -- OFF → balikin ke default
         pilActive = false
-        restoreDefaultEmotes()
+        if defaultDescription then
+            myHum:ApplyDescription(defaultDescription)
+        end
         return false
     else
-        -- ON
+        -- ON → copy nearest
         pilActive = true
-
-        local target = getNearestPlayer()
-        if target then
-            copyEmoteWheel(target)
-        else
-            warn("❌ Tidak ada player di depan untuk dicopy")
+        if not defaultDescription then
+            defaultDescription = myHum:GetAppliedDescription()
         end
 
+        local target = getNearestPlayer()
+        if target and target.Character then
+            local hum = target.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local desc = hum:GetAppliedDescription()
+                myHum:ApplyDescription(desc)
+            end
+        end
         return true
     end
 end
 
--- Hubungkan ke button header PIL
+-- hubungkan ke button header PIL
 buttonObjects["PIL"].MouseButton1Click:Connect(function()
     local active = togglePIL()
     buttonObjects["PIL"].BackgroundColor3 =
