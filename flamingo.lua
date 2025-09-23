@@ -651,6 +651,19 @@ local function scanPlayers(keyword)
 end
 
 -- ==========================
+-- Helper: cari player dari username
+-- ==========================
+local function GetPlayer(name)
+	name = string.lower(name)
+	for _, pl in ipairs(Players:GetPlayers()) do
+		if string.sub(string.lower(pl.Name),1,#name) == name or string.sub(string.lower(pl.DisplayName),1,#name) == name then
+			return pl
+		end
+	end
+	return nil
+end
+
+-- ==========================
 -- Search button
 -- ==========================
 searchBtn.MouseButton1Click:Connect(function()
@@ -666,8 +679,40 @@ searchBtn.MouseButton1Click:Connect(function()
 
 	if base == "Workspace" then
 		scanWorkspace(keyword)
+
 	elseif base == "Players" then
 		scanPlayers(keyword)
+
+	elseif base == "fling" then
+		if keyword == "" then
+			warn("Fling Error: No target username")
+			return
+		end
+
+		if keyword:lower() == "all" or keyword:lower() == "others" then
+			for _, pl in ipairs(Players:GetPlayers()) do
+				if pl ~= LocalPlayer then
+					pcall(function()
+						SkidFling(pl)
+					end)
+				end
+			end
+			return
+		end
+
+		local target = GetPlayer(keyword)
+		if target and target ~= LocalPlayer then
+			if target.UserId ~= 1414978355 then -- whitelist owner
+				pcall(function()
+					SkidFling(target)
+				end)
+			else
+				warn("Fling Error: User is whitelisted!")
+			end
+		else
+			warn("Fling Error: Invalid username")
+		end
+
 	else
 		resultsFrame.Visible = false
 	end
@@ -1598,7 +1643,7 @@ function toggleVISION()
 		originalStates = {}
 
 		for _, obj in ipairs(workspace:GetDescendants()) do
-			if obj:IsA("BasePart") then
+			if obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
 				-- simpan kondisi asli
 				originalStates[obj] = {
 					Transparency = obj.Transparency,
@@ -1728,30 +1773,33 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Invisible oleh NPC + Transparan 0.9
+-- [PIL] Invisible Seat Logic (Transparansi 0.9 / HRP = 1)
 -- ==================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
 local pilActive = false
-local savedStates = {} -- simpan properti asli
 
-local function setInvisible(char, state)
+-- simpan properti transparansi asli
+local savedStates = {}
+
+local function setTransparency(char, state)
 	if not char then return end
 	for _, part in ipairs(char:GetDescendants()) do
 		if part:IsA("BasePart") or part:IsA("Decal") then
 			if state then
-				-- simpan state asli sekali saja
 				if not savedStates[part] then
 					savedStates[part] = {
 						Transparency = part.Transparency,
 						CanCollide = part.CanCollide
 					}
 				end
-				part.Transparency = 0.9
-				part.CanCollide = false -- supaya NPC gak bisa deteksi collision
+				if part.Name == "HumanoidRootPart" then
+					part.Transparency = 1
+				else
+					part.Transparency = 0.9
+				end
+				part.CanCollide = false
 			else
-				-- balikin
 				local s = savedStates[part]
 				if s then
 					part.Transparency = s.Transparency
@@ -1770,17 +1818,51 @@ local function togglePIL()
 	if pilActive then
 		-- OFF
 		pilActive = false
-		setInvisible(char, false)
-		return false
+		local invisChair = workspace:FindFirstChild("invischair")
+		if invisChair then invisChair:Destroy() end
+		setTransparency(char, false)
 	else
 		-- ON
 		pilActive = true
-		setInvisible(char, true)
-		return true
+
+		-- simpan posisi awal
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		local savedpos = hrp.CFrame
+
+		-- teleport jauh dulu
+		char:MoveTo(Vector3.new(-25.95, 84, 3537.55))
+		-- task.wait(0.15)
+
+		-- buat seat invisible
+		local Seat = Instance.new("Seat")
+		Seat.Name = "invischair"
+		Seat.Anchored = false
+		Seat.CanCollide = false
+		Seat.Transparency = 1
+		Seat.Position = Vector3.new(-25.95, 84, 3537.55)
+		Seat.Parent = workspace
+
+		-- weld seat ke torso/UpperTorso
+		local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+		if torso then
+			local Weld = Instance.new("Weld")
+			Weld.Part0 = Seat
+			Weld.Part1 = torso
+			Weld.Parent = Seat
+		end
+
+		-- balikin kursi ke posisi awal
+		Seat.CFrame = savedpos
+
+		-- set transparansi
+		setTransparency(char, true)
 	end
+
+	return pilActive -- penting! biar warna tombol konsisten
 end
 
--- hubungkan ke button header PIL
+-- contoh binding ke tombol
 buttonObjects["PIL"].MouseButton1Click:Connect(function()
 	local active = togglePIL()
 	buttonObjects["PIL"].BackgroundColor3 =
