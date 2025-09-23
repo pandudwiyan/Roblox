@@ -147,63 +147,166 @@ for i, txt in ipairs(labels) do
 			inputBox.Text = "cp" .. cpCounter
 
 		elseif string.find(txt, "inspect:") then
-			-- toggle on/off
-			inspectEnabled = not inspectEnabled
-			label.Text = inspectEnabled and "inspect:on" or "inspect:off"
-			inputBox.Text = label.Text
+	-- toggle on/off
+	inspectEnabled = not inspectEnabled
+	label.Text = inspectEnabled and "inspect:on" or "inspect:off"
+	inputBox.Text = label.Text
 
-			-- hapus semua billboards dulu
-			for obj, billboard in pairs(inspectBillboards) do
-				if billboard and billboard.Parent then
-					billboard:Destroy()
+	-- hapus semua billboards dulu
+	for obj, billboard in pairs(inspectBillboards) do
+		if billboard and billboard.Parent then
+			billboard:Destroy()
+		end
+	end
+	inspectBillboards = {}
+
+	if inspectEnabled then
+		-- tambahkan billboard ke semua objek workspace
+		for _, obj in ipairs(workspace:GetChildren()) do
+			if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
+				local billboard = Instance.new("BillboardGui")
+				billboard.Adornee = obj.HumanoidRootPart
+				billboard.Size = UDim2.new(0, 100, 0, 20)
+				billboard.StudsOffset = Vector3.new(0, 3, 0)
+				billboard.AlwaysOnTop = true
+				billboard.Parent = obj
+
+				local textLabel = Instance.new("TextLabel")
+				textLabel.Size = UDim2.new(1, 0, 1, 0)
+				textLabel.BackgroundTransparency = 1
+				textLabel.Text = obj.Name
+				textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+				textLabel.TextStrokeTransparency = 0
+				textLabel.Font = Enum.Font.SourceSansBold
+				textLabel.TextScaled = true
+				textLabel.Parent = billboard
+
+				inspectBillboards[obj] = billboard
+			elseif obj:IsA("BasePart") then
+				local billboard = Instance.new("BillboardGui")
+				billboard.Adornee = obj
+				billboard.Size = UDim2.new(0, 100, 0, 20)
+				billboard.StudsOffset = Vector3.new(0, 3, 0)
+				billboard.AlwaysOnTop = true
+				billboard.Parent = obj
+
+				local textLabel = Instance.new("TextLabel")
+				textLabel.Size = UDim2.new(1, 0, 1, 0)
+				textLabel.BackgroundTransparency = 1
+				textLabel.Text = obj.Name
+				textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+				textLabel.TextStrokeTransparency = 0
+				textLabel.Font = Enum.Font.SourceSansBold
+				textLabel.TextScaled = true
+				textLabel.Parent = billboard
+
+				inspectBillboards[obj] = billboard
+			end
+		end
+
+		-- === tambahan: klik object untuk select & konfirmasi hapus ===
+		local UserInputService = game:GetService("UserInputService")
+		local mouse = player:GetMouse()
+		local selectedInspectPart
+		local highlight
+
+		-- UI konfirmasi
+		local confirmFrame = Instance.new("Frame")
+		confirmFrame.Size = UDim2.new(0, 160, 0, 60)
+		confirmFrame.AnchorPoint = Vector2.new(0.5,0.5)
+		confirmFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- tengah layar
+		confirmFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+		confirmFrame.Visible = false
+		confirmFrame.ZIndex = 9999 -- paling atas
+		confirmFrame.Parent = content -- kalau mau benar-benar bebas, ubah ke screenGui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0,6)
+		corner.Parent = confirmFrame
+
+		local confirmLabel = Instance.new("TextLabel")
+		confirmLabel.Size = UDim2.new(1,0,0,25)
+		confirmLabel.BackgroundTransparency = 1
+		confirmLabel.TextColor3 = Color3.new(1,1,1)
+		confirmLabel.Font = Enum.Font.SourceSansBold
+		confirmLabel.TextSize = 14
+		confirmLabel.Text = "Hapus object ini?"
+		confirmLabel.ZIndex = 10000
+		confirmLabel.Parent = confirmFrame
+
+		local yesBtn = Instance.new("TextButton")
+		yesBtn.Size = UDim2.new(0,70,0,25)
+		yesBtn.Position = UDim2.new(0,10,0,30)
+		yesBtn.BackgroundColor3 = Color3.fromRGB(150,50,50)
+		yesBtn.Text = "YES"
+		yesBtn.TextColor3 = Color3.new(1,1,1)
+		yesBtn.Font = Enum.Font.SourceSansBold
+		yesBtn.TextSize = 14
+		yesBtn.ZIndex = 10000
+		yesBtn.Parent = confirmFrame
+
+		local noBtn = Instance.new("TextButton")
+		noBtn.Size = UDim2.new(0,70,0,25)
+		noBtn.Position = UDim2.new(0,85,0,30)
+		noBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+		noBtn.Text = "NO"
+		noBtn.TextColor3 = Color3.new(1,1,1)
+		noBtn.Font = Enum.Font.SourceSansBold
+		noBtn.TextSize = 14
+		noBtn.ZIndex = 10000
+		noBtn.Parent = confirmFrame
+
+
+		-- fungsi highlight
+		local function clearHighlight()
+			if highlight then highlight:Destroy() highlight=nil end
+		end
+		local function highlightObj(obj)
+			clearHighlight()
+			local hl = Instance.new("Highlight")
+			hl.Adornee = obj
+			hl.FillColor = Color3.fromRGB(255,0,0)
+			hl.FillTransparency = 0.5
+			hl.OutlineTransparency = 0
+			hl.Parent = obj
+			highlight = hl
+		end
+
+		-- event klik object
+		inspectClickConn = UserInputService.InputBegan:Connect(function(input,gpe)
+			if gpe then return end
+			if inspectEnabled and input.UserInputType == Enum.UserInputType.MouseButton1 then
+				local target = mouse.Target
+				if target then
+					selectedInspectPart = target
+					highlightObj(target)
+					confirmFrame.Visible = true
 				end
 			end
-			inspectBillboards = {}
+		end)
 
-			if inspectEnabled then
-				-- tambahkan billboard ke semua objek workspace
-				for _, obj in ipairs(workspace:GetChildren()) do
-					if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
-						local billboard = Instance.new("BillboardGui")
-						billboard.Adornee = obj.HumanoidRootPart
-						billboard.Size = UDim2.new(0, 100, 0, 20)
-						billboard.StudsOffset = Vector3.new(0, 3, 0)
-						billboard.AlwaysOnTop = true
-						billboard.Parent = obj
-
-						local textLabel = Instance.new("TextLabel")
-						textLabel.Size = UDim2.new(1, 0, 1, 0)
-						textLabel.BackgroundTransparency = 1
-						textLabel.Text = obj.Name
-						textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-						textLabel.TextStrokeTransparency = 0
-						textLabel.Font = Enum.Font.SourceSansBold
-						textLabel.TextScaled = true
-						textLabel.Parent = billboard
-
-						inspectBillboards[obj] = billboard
-					elseif obj:IsA("BasePart") then
-						local billboard = Instance.new("BillboardGui")
-						billboard.Adornee = obj
-						billboard.Size = UDim2.new(0, 100, 0, 20)
-						billboard.StudsOffset = Vector3.new(0, 3, 0)
-						billboard.AlwaysOnTop = true
-						billboard.Parent = obj
-
-						local textLabel = Instance.new("TextLabel")
-						textLabel.Size = UDim2.new(1, 0, 1, 0)
-						textLabel.BackgroundTransparency = 1
-						textLabel.Text = obj.Name
-						textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-						textLabel.TextStrokeTransparency = 0
-						textLabel.Font = Enum.Font.SourceSansBold
-						textLabel.TextScaled = true
-						textLabel.Parent = billboard
-
-						inspectBillboards[obj] = billboard
-					end
-				end
+		-- tombol YES / NO
+		yesBtn.MouseButton1Click:Connect(function()
+			if selectedInspectPart and selectedInspectPart.Parent then
+				selectedInspectPart:Destroy()
 			end
+			confirmFrame.Visible = false
+			clearHighlight()
+			selectedInspectPart = nil
+		end)
+		noBtn.MouseButton1Click:Connect(function()
+			confirmFrame.Visible = false
+			clearHighlight()
+			selectedInspectPart = nil
+		end)
+
+	else
+		-- kalau inspect dimatikan
+		if inspectClickConn then
+			inspectClickConn:Disconnect()
+			inspectClickConn = nil
+		end
+	end
 
 		else
 			-- default → copy text ke inputBox
@@ -346,6 +449,14 @@ local function hookButtonLogic(btn, actionName, target)
 			local active = toggleBring(target)
 			btn.Text = active and "Unbring" or "Bring"
 		end)
+
+	elseif actionName == "Mimic" then
+    btn.MouseButton1Click:Connect(function()
+        -- 'target' di sini adalah yang dipassing dari scanPlayers: plr.Character atau plr
+        -- kita panggil mimicPlayer dengan parameter tersebut
+        pcall(function() mimicPlayer(target) end)
+    end)
+
 	end
 end
 
@@ -498,6 +609,7 @@ local function scanPlayers(keyword)
 		createButton(btnContainer, "Teleport", Color3.fromRGB(120,70,120))
 		createButton(btnContainer, "Line", Color3.fromRGB(70,70,120))
 		createButton(btnContainer, "Bring", Color3.fromRGB(200,120,50))
+		createButton(btnContainer, "Mimic", Color3.fromRGB(120,120,220))
 
 		-- sambungkan semua button
 		for _, child in ipairs(btnContainer:GetChildren()) do
@@ -782,6 +894,160 @@ function removeFlag(target)
 		target:Destroy()
 	end
 end
+
+-- [6] Mimic
+-- ====== MIMIC: copy appearance & animate from target player/character ======
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local lastMimicTarget = nil -- simpan target untuk reapply saat respawn (opsional)
+
+local function safeApplyDescription(myHumanoid, desc)
+    if not myHumanoid or not desc then return end
+    local ok, err = pcall(function()
+        myHumanoid:ApplyDescription(desc)
+    end)
+    if not ok then
+        warn("ApplyDescription failed:", err)
+    end
+end
+
+local function clearMyAccessories(myChar)
+    if not myChar then return end
+    for _, c in ipairs(myChar:GetChildren()) do
+        if c:IsA("Accessory") then
+            c:Destroy()
+        end
+    end
+end
+
+local function cloneAnimationsToMyChar(targetChar, myChar)
+    if not targetChar or not myChar then return end
+    -- clone any Animation instances (so Animate script can reference them)
+    for _, inst in ipairs(targetChar:GetDescendants()) do
+        if inst:IsA("Animation") then
+            local ok, copy = pcall(function() return inst:Clone() end)
+            if ok and copy then
+                copy.Parent = myChar
+            end
+        end
+    end
+    -- clone Animate script (replace ours)
+    if targetChar:FindFirstChild("Animate") then
+        if myChar:FindFirstChild("Animate") then
+            myChar.Animate:Destroy()
+        end
+        local ok, animScript = pcall(function() return targetChar.Animate:Clone() end)
+        if ok and animScript then
+            animScript.Parent = myChar
+        end
+    end
+end
+
+local function mimicPlayer(target)
+    -- target may be Player or Model (character)
+    if not target then return end
+
+    local targetPlayer = nil
+    local targetChar = nil
+
+    if typeof(target) == "Instance" then
+        if target:IsA("Player") then
+            targetPlayer = target
+            targetChar = targetCharacter
+            targetChar = target.PlayerGui and target.Character or target.Character -- fallback
+            targetChar = target.Character
+        elseif target:IsA("Model") then
+            targetChar = target
+            targetPlayer = Players:GetPlayerFromCharacter(targetChar)
+        end
+    end
+
+    -- fallback: if we have no player but model with humanoid -> get player
+    if not targetPlayer and targetChar then
+        targetPlayer = Players:GetPlayerFromCharacter(targetChar)
+    end
+
+    if not targetPlayer then
+        -- sometimes scanPlayers passes plr.Character or plr, so try to handle naming
+        if typeof(target) == "string" then
+            targetPlayer = Players:FindFirstChild(target)
+        end
+    end
+
+    if not targetPlayer and not targetChar then
+        warn("Mimic: target player/character not found")
+        return
+    end
+
+    -- ensure we have a targetChar (try to find in workspace by player name)
+    if not targetChar and targetPlayer then
+        targetChar = targetPlayer.Character or workspace:FindFirstChild(targetPlayer.Name)
+    end
+
+    -- remember target for respawn reapply (optional)
+    lastMimicTarget = targetPlayer
+
+    -- Apply HumanoidDescription if possible (best method)
+    local success, desc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+    end)
+
+    local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local myHum = myChar:FindFirstChildOfClass("Humanoid") or myChar:WaitForChild("Humanoid")
+
+    if success and desc then
+        -- remove accessories first to prevent duplicates
+        clearMyAccessories(myChar)
+        safeApplyDescription(myHum, desc)
+    else
+        -- fallback: clone accessories & clothing manually from character (if available)
+        if targetChar then
+            -- remove my accessories first
+            clearMyAccessories(myChar)
+
+            for _, child in ipairs(targetChar:GetChildren()) do
+                if child:IsA("Accessory") then
+                    local ok, cloned = pcall(function() return child:Clone() end)
+                    if ok and cloned then
+                        -- prefer Humanoid:AddAccessory if exists
+                        if myHum and myHum.AddAccessory then
+                            pcall(function() myHum:AddAccessory(cloned) end)
+                        else
+                            cloned.Parent = myChar
+                        end
+                    end
+                elseif child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") then
+                    local ok, cloned = pcall(function() return child:Clone() end)
+                    if ok and cloned then
+                        -- replace ours
+                        if myChar:FindFirstChild(child.ClassName) then
+                            myChar:FindFirstChild(child.ClassName):Destroy()
+                        end
+                        cloned.Parent = myChar
+                    end
+                end
+            end
+        end
+    end
+
+    -- Clone animate script + animation objects
+    if targetChar then
+        cloneAnimationsToMyChar(targetChar, myChar)
+    end
+
+    -- done
+    print("Mimic: applied appearance from", targetPlayer.Name)
+end
+
+-- Optional: if you want mimic re-applied when you respawn:
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if lastMimicTarget then
+        -- small wait for character to be ready
+        task.wait(0.5)
+        pcall(function() mimicPlayer(lastMimicTarget) end)
+    end
+end)
 
 -- [5] Bring Toggle
 local bringStates = {}
@@ -1572,11 +1838,23 @@ local function toggleReverse()
 		reverseActive = true
 
 		task.spawn(function()
+			local startTime = tick()
 			for i = #buffer, 1, -1 do
 				if not reverseActive or not hrp then break end
 				hrp.CFrame = buffer[i]
 				task.wait(1/fps)
+
+				-- cek auto-off kalau sudah 15 detik
+				if tick() - startTime >= maxSeconds then
+					reverseActive = false
+					recording = true
+					break
+				end
 			end
+
+			-- pastikan tombol balik abu-abu
+			buttonObjects["RVSE"].BackgroundColor3 = Color3.fromRGB(50,50,50)
+
 			reverseActive = false
 			recording = true
 		end)
