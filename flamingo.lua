@@ -655,8 +655,9 @@ end
 -- ==========================
 local function GetPlayer(name)
 	name = string.lower(name)
-	for _, pl in ipairs(Players:GetPlayers()) do
-		if string.sub(string.lower(pl.Name),1,#name) == name or string.sub(string.lower(pl.DisplayName),1,#name) == name then
+	for _, pl in ipairs(game:GetService("Players"):GetPlayers()) do
+		if string.sub(string.lower(pl.Name),1,#name) == name 
+			or string.sub(string.lower(pl.DisplayName),1,#name) == name then
 			return pl
 		end
 	end
@@ -732,14 +733,14 @@ end
 -- Usage: SkidFling(targetPlayer)
 -- NOTE: hasil tergantung game & anti-cheat. Gunakan bertanggung jawab.
 local Players = game:GetService("Players")
-local workspace = workspace
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 
 function SkidFling(targetPlayer)
 	if not targetPlayer or not targetPlayer.Parent then return end
 
-	local LocalPlayer = Players.LocalPlayer
 	local Character = LocalPlayer and LocalPlayer.Character
 	if not (Character and Character.PrimaryPart) then
 		Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
