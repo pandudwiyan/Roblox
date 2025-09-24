@@ -471,7 +471,7 @@ local function hookButtonLogic(btn, actionName, target)
 		btn.MouseButton1Click:Connect(function()
 			-- 'target' di sini adalah yang dipassing dari scanPlayers: plr.Character atau plr
 			-- kita panggil mimicPlayer dengan parameter tersebut
-			pcall(function() mimicPlayer(target) end)
+			pcall(function() mimicPlayer(target, btn) end)
 		end)
 
 	end
@@ -728,6 +728,199 @@ local function hasResults()
 	return false
 end
 
+-- SkidFling
+-- Usage: SkidFling(targetPlayer)
+-- NOTE: hasil tergantung game & anti-cheat. Gunakan bertanggung jawab.
+local Players = game:GetService("Players")
+local workspace = workspace
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+
+function SkidFling(targetPlayer)
+	if not targetPlayer or not targetPlayer.Parent then return end
+
+	local LocalPlayer = Players.LocalPlayer
+	local Character = LocalPlayer and LocalPlayer.Character
+	if not (Character and Character.PrimaryPart) then
+		Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	end
+
+	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	local RootPart = (Humanoid and Humanoid.RootPart) or Character:FindFirstChild("HumanoidRootPart") or Character.PrimaryPart
+	if not (Humanoid and RootPart) then
+		warn("SkidFling: local humanoid/rootpart missing")
+		return
+	end
+
+	local TCharacter = targetPlayer.Character
+	if not (TCharacter and TCharacter.Parent) then
+		warn("SkidFling: target character missing")
+		return
+	end
+
+	-- gather common target parts
+	local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
+	local TRootPart = (THumanoid and THumanoid.RootPart) or TCharacter:FindFirstChild("HumanoidRootPart")
+	local THead = TCharacter:FindFirstChild("Head")
+	local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
+	local Handle = Accessory and Accessory:FindFirstChild("Handle")
+
+	-- safety: don't fling owner (user id check can be applied by caller)
+	-- save old data for restore
+	local ok, oldCF = pcall(function() return RootPart.CFrame end)
+	if ok then
+		getgenv().OldPos = oldCF
+	else
+		getgenv().OldPos = CFrame.new(0,1000,0)
+	end
+
+	-- Save FallenPartsDestroyHeight so we can restore later
+	if getgenv().FPDH == nil then
+		getgenv().FPDH = workspace.FallenPartsDestroyHeight
+	end
+
+	-- Helper to set position + velocity burst (mirrors FPos in ref)
+	local function FPos(BasePart, PosCFrameOffset, AngleCFrame)
+		if not (RootPart and RootPart.Parent and BasePart and BasePart.Parent) then return end
+		-- try to set our rootpart to near target
+		pcall(function()
+			RootPart.CFrame = CFrame.new(BasePart.Position) * (PosCFrameOffset or CFrame.new())
+			if Character.PrimaryPart then
+				Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * (PosCFrameOffset or CFrame.new()) * (AngleCFrame or CFrame.Angles(0,0,0)))
+			end
+			-- give huge instantaneous velocity to encourage fling collisions
+			RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+			RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+		end)
+	end
+
+	-- The SFBasePart loop (attempts sequences until target gets high velocity or timeout)
+	local function SFBasePart(BasePart)
+		if not BasePart then return end
+		local TimeToWait = 2
+		local Time = tick()
+		local Angle = 0
+
+		repeat
+			if not (RootPart and RootPart.Parent and THumanoid and THumanoid.Parent) then break end
+
+			if BasePart.Velocity.Magnitude < 50 then
+				Angle = Angle + 100
+				FPos(BasePart, CFrame.new(0, 1.5, 0) + (THumanoid.MoveDirection * (BasePart.Velocity.Magnitude / 1.25)), CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0) + (THumanoid.MoveDirection * (BasePart.Velocity.Magnitude / 1.25)), CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + (THumanoid.MoveDirection * (BasePart.Velocity.Magnitude / 1.25)), CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + (THumanoid.MoveDirection * (BasePart.Velocity.Magnitude / 1.25)), CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0,0))
+				task.wait()
+			else
+				-- when target parts are already moving faster, use different offsets
+				FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0,0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0,0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0,0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(-90),0,0))
+				task.wait()
+				FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0,0,0))
+				task.wait()
+			end
+
+			-- break conditions (similar to reference)
+		until (BasePart.Velocity.Magnitude > 500) or (not TargetPlayer or TargetPlayer.Parent ~= Players) or (BasePart.Parent ~= targetPlayer.Character) or (not THumanoid) or (THumanoid.Sit) or (Humanoid.Health <= 0) or (tick() > Time + TimeToWait)
+	end
+
+	-- Begin attack routine (protected)
+	pcall(function()
+		workspace.FallenPartsDestroyHeight = 0/0 -- set to infinite
+		-- temporary BodyVelocity to make us "unstoppable" for short time
+		local BV = Instance.new("BodyVelocity")
+		BV.Name = "EpixVel"
+		BV.Parent = RootPart
+		BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+		BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+
+		-- disable seated state to avoid being stuck
+		Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+		-- choose which basepart to use for fling sequence (head > root > accessory handle)
+		if TRootPart and THead then
+			if (TRootPart.Position - THead.Position).Magnitude > 5 then
+				SFBasePart(THead)
+			else
+				SFBasePart(TRootPart)
+			end
+		elseif TRootPart then
+			SFBasePart(TRootPart)
+		elseif THead then
+			SFBasePart(THead)
+		elseif Handle then
+			SFBasePart(Handle)
+		else
+			-- nothing to target
+			-- cleanup
+			if BV and BV.Parent then BV:Destroy() end
+			Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+			workspace.CurrentCamera.CameraSubject = Humanoid
+			return
+		end
+
+		-- cleanup after sequence
+		if BV and BV.Parent then BV:Destroy() end
+		Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+		workspace.CurrentCamera.CameraSubject = Humanoid
+	end)
+
+	-- attempt to return player back to old pos smoothly
+	local successRestore = false
+	local attempts = 0
+	repeat
+		attempts = attempts + 1
+		pcall(function()
+			if getgenv().OldPos then
+				RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+				if Character.PrimaryPart then
+					Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
+				end
+				Humanoid:ChangeState("GettingUp")
+				for _, x in ipairs(Character:GetChildren()) do
+					if x:IsA("BasePart") then
+						x.Velocity = Vector3.new()
+						x.RotVelocity = Vector3.new()
+					end
+				end
+			end
+		end)
+		task.wait(0.1)
+		if getgenv().OldPos then
+			successRestore = (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
+		else
+			successRestore = true
+		end
+	until successRestore or attempts > 40
+
+	-- restore FallenPartsDestroyHeight
+	if getgenv().FPDH ~= nil then
+		workspace.FallenPartsDestroyHeight = getgenv().FPDH
+	end
+end
+
 -- FUNCTION Minimize
 buttonObjects["_"].MouseButton1Click:Connect(function()
 	local minimized = mainFrame:GetAttribute("Minimized")
@@ -958,55 +1151,34 @@ function removeFlag(target)
 end
 
 -- [6] Mimic
--- ====== MIMIC: copy appearance & animate from target player/character ======
+-- ====== MIMIC: realtime sync gerakan + animasi target player/character ======
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local lastMimicTarget = nil -- simpan target untuk reapply saat respawn (opsional)
+local mimicConn
+local animConn
+local lastMimicTarget = nil
 
-local function safeApplyDescription(myHumanoid, desc)
-	if not myHumanoid or not desc then return end
-	local ok, err = pcall(function()
-		myHumanoid:ApplyDescription(desc)
-	end)
-	if not ok then
-		warn("ApplyDescription failed:", err)
-	end
+-- Stop mimic (dipakai juga saat respawn)
+local function stopMimic()
+	if mimicConn then mimicConn:Disconnect() mimicConn=nil end
+	if animConn then animConn:Disconnect() animConn=nil end
+	lastMimicTarget = nil
+	print("Mimic OFF")
 end
 
-local function clearMyAccessories(myChar)
-	if not myChar then return end
-	for _, c in ipairs(myChar:GetChildren()) do
-		if c:IsA("Accessory") then
-			c:Destroy()
-		end
-	end
-end
-
-local function replaceAnimate(targetChar, myChar)
-	if not (targetChar and myChar) then return end
-
-	-- hapus Animate lama
-	local myAnimate = myChar:FindFirstChild("Animate")
-	if myAnimate then
-		myAnimate:Destroy()
+-- Toggle mimic realtime
+local function mimicPlayer(target, buttonRef)
+	-- OFF kalau sudah aktif
+	if mimicConn then
+		stopMimic()
+		if buttonRef then buttonRef.Text = "Mimic" end
+		return false
 	end
 
-	-- clone Animate dari target
-	local targetAnimate = targetChar:FindFirstChild("Animate")
-	if targetAnimate then
-		local newAnimate = targetAnimate:Clone()
-		newAnimate.Parent = myChar
-	end
-end
-
-local function mimicPlayer(target)
-	-- target may be Player or Model (character)
-	if not target then return end
-
-	local targetPlayer = nil
-	local targetChar = nil
-
+	-- Validasi target
+	local targetPlayer, targetChar
 	if typeof(target) == "Instance" then
 		if target:IsA("Player") then
 			targetPlayer = target
@@ -1016,85 +1188,65 @@ local function mimicPlayer(target)
 			targetPlayer = Players:GetPlayerFromCharacter(targetChar)
 		end
 	end
-
-	-- fallback: if we have no player but model with humanoid -> get player
-	if not targetPlayer and targetChar then
-		targetPlayer = Players:GetPlayerFromCharacter(targetChar)
-	end
-
-	if not targetPlayer then
-		-- sometimes scanPlayers passes plr.Character or plr, so try to handle naming
-		if typeof(target) == "string" then
-			targetPlayer = Players:FindFirstChild(target)
-		end
-	end
-
-	if not targetPlayer and not targetChar then
-		warn("Mimic: target player/character not found")
-		return
-	end
-
-	-- ensure we have a targetChar (try to find in workspace by player name)
 	if not targetChar and targetPlayer then
-		targetChar = targetPlayer.Character or workspace:FindFirstChild(targetPlayer.Name)
+		targetChar = targetPlayer.Character
 	end
-
-	-- remember target for respawn reapply (optional)
-	lastMimicTarget = targetPlayer
-
-	-- Apply HumanoidDescription if possible (best method)
-	local success, desc = pcall(function()
-		return Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
-	end)
+	if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
+		warn("Mimic: target tidak valid")
+		return false
+	end
 
 	local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local myHum = myChar:FindFirstChildOfClass("Humanoid") or myChar:WaitForChild("Humanoid")
+	local myHum = myChar:WaitForChild("Humanoid")
+	local myHRP = myChar:WaitForChild("HumanoidRootPart")
+	local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 
-	if success and desc then
-		-- remove accessories first to prevent duplicates
-		clearMyAccessories(myChar)
-		safeApplyDescription(myHum, desc)
-	else
-		-- fallback: clone accessories & clothing manually from character (if available)
-		if targetChar then
-			clearMyAccessories(myChar)
-			for _, child in ipairs(targetChar:GetChildren()) do
-				if child:IsA("Accessory") then
-					local ok, cloned = pcall(function() return child:Clone() end)
-					if ok and cloned then
-						if myHum and myHum.AddAccessory then
-							pcall(function() myHum:AddAccessory(cloned) end)
-						else
-							cloned.Parent = myChar
-						end
-					end
-				elseif child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") then
-					local ok, cloned = pcall(function() return child:Clone() end)
-					if ok and cloned then
-						if myChar:FindFirstChild(child.ClassName) then
-							myChar:FindFirstChild(child.ClassName):Destroy()
-						end
-						cloned.Parent = myChar
-					end
-				end
-			end
+	lastMimicTarget = targetChar
+
+	-- Sync posisi + gerakan
+	mimicConn = RunService.Heartbeat:Connect(function()
+		if not lastMimicTarget or not targetChar.Parent then
+			stopMimic()
+			if buttonRef then buttonRef.Text = "Mimic" end
+			return
 		end
+
+		if targetHRP and myHRP then
+			-- offset 2 stud ke kanan supaya tidak tabrakan
+			myHRP.CFrame = targetHRP.CFrame * CFrame.new(2,0,0)
+		end
+
+		if targetHum and myHum then
+			myHum:Move(targetHum.MoveDirection, false)
+			myHum.Jump = targetHum.Jump
+		end
+	end)
+
+	-- Sync animasi (clone track yang dimainkan target)
+	if targetHum and targetHum:FindFirstChild("Animator") and myHum:FindFirstChild("Animator") then
+		local tAnimator = targetHum.Animator
+		local mAnimator = myHum.Animator
+
+		animConn = tAnimator.AnimationPlayed:Connect(function(track)
+			local ok, newTrack = pcall(function()
+				return mAnimator:LoadAnimation(track.Animation)
+			end)
+			if ok and newTrack then
+				newTrack:Play()
+			end
+		end)
 	end
 
-	-- Ganti Animate
-	if targetChar and myChar then
-		replaceAnimate(targetChar, myChar)
-	end
-
-	print("Mimic: applied appearance from", targetPlayer.Name)
+	if buttonRef then buttonRef.Text = "Unmimic" end
+	print("Mimic ON ke", targetChar.Name)
+	return true
 end
 
--- Optional: if you want mimic re-applied when you respawn:
-LocalPlayer.CharacterAdded:Connect(function(char)
-	if lastMimicTarget then
-		-- small wait for character to be ready
-		task.wait(0.5)
-		pcall(function() mimicPlayer(lastMimicTarget) end)
+-- Saat respawn, matikan mimic
+LocalPlayer.CharacterAdded:Connect(function()
+	if mimicConn or animConn then
+		stopMimic()
 	end
 end)
 
@@ -1103,33 +1255,59 @@ local bringStates = {}
 
 function toggleBring(target)
 	if bringStates[target] then
-		-- Kembalikan ke posisi asli
-		if target.Parent == workspace then
-			target.CFrame = bringStates[target]
-		end
+		-- === UNBRING ===
+		local saved = bringStates[target]
 		bringStates[target] = nil
+
+		if target:IsA("BasePart") then
+			if target.Parent == workspace then
+				target.CFrame = saved.CFrame
+				target.Anchored = saved.Anchored
+			end
+		elseif target:IsA("Model") and target.PrimaryPart then
+			if target.Parent == workspace then
+				target:SetPrimaryPartCFrame(saved.CFrame)
+				-- restore semua BasePart anchoring
+				for _, part in ipairs(target:GetDescendants()) do
+					if part:IsA("BasePart") and saved.AnchoredParts[part] ~= nil then
+						part.Anchored = saved.AnchoredParts[part]
+					end
+				end
+			end
+		end
 		return false
 	else
-		-- Simpan posisi asli
-		if target:IsA("BasePart") then
-			bringStates[target] = target.CFrame
-		elseif target:IsA("Model") and target.PrimaryPart then
-			bringStates[target] = target.PrimaryPart.CFrame
-		else
+		-- === BRING ===
+		if not target:IsA("BasePart") and not (target:IsA("Model") and target.PrimaryPart) then
 			return
 		end
 
 		local char = LocalPlayer.Character
 		if not (char and char:FindFirstChild("HumanoidRootPart")) then return end
 		local hrp = char.HumanoidRootPart
+		local newPos = hrp.CFrame * CFrame.new(0, 0, -5) -- 5 stud di depan player
 
-		local newPos = hrp.CFrame * CFrame.new(0, 0, -5) -- 5 stud depan player
 		if target:IsA("BasePart") then
+			bringStates[target] = {
+				CFrame = target.CFrame,
+				Anchored = target.Anchored
+			}
+			target.Anchored = false
 			target.CFrame = newPos
 		elseif target:IsA("Model") and target.PrimaryPart then
+			local savedAnchors = {}
+			for _, part in ipairs(target:GetDescendants()) do
+				if part:IsA("BasePart") then
+					savedAnchors[part] = part.Anchored
+					part.Anchored = false
+				end
+			end
+			bringStates[target] = {
+				CFrame = target.PrimaryPart.CFrame,
+				AnchoredParts = savedAnchors
+			}
 			target:SetPrimaryPartCFrame(newPos)
 		end
-
 		return true
 	end
 end
@@ -1773,100 +1951,63 @@ buttonObjects["FREEZE"].MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- [PIL] Invisible Seat Logic (Transparansi 0.9 / HRP = 1)
+-- [PIL] Glow Light Mode
 -- ==================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local pilActive = false
+local lightRef = nil
 
--- simpan properti transparansi asli
-local savedStates = {}
-
-local function setTransparency(char, state)
-	if not char then return end
-	for _, part in ipairs(char:GetDescendants()) do
-		if part:IsA("BasePart") or part:IsA("Decal") then
-			if state then
-				if not savedStates[part] then
-					savedStates[part] = {
-						Transparency = part.Transparency,
-						CanCollide = part.CanCollide
-					}
-				end
-				if part.Name == "HumanoidRootPart" then
-					part.Transparency = 1
-				else
-					part.Transparency = 0.9
-				end
-				part.CanCollide = false
-			else
-				local s = savedStates[part]
-				if s then
-					part.Transparency = s.Transparency
-					part.CanCollide = s.CanCollide
-				end
-			end
-		end
-	end
-	if not state then
-		savedStates = {}
-	end
-end
-
-local function togglePIL()
+-- enable glow
+local function enablePIL()
 	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	if pilActive then
-		-- OFF
-		pilActive = false
-		local invisChair = workspace:FindFirstChild("invischair")
-		if invisChair then invisChair:Destroy() end
-		setTransparency(char, false)
-	else
-		-- ON
-		pilActive = true
+	local hrp = char:WaitForChild("HumanoidRootPart")
 
-		-- simpan posisi awal
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if not hrp then return end
-		local savedpos = hrp.CFrame
+	-- bikin lampu
+	local light = Instance.new("PointLight")
+	light.Name = "PIL_Light"
+	light.Color = Color3.fromRGB(0, 200, 255) -- biru cerah
+	light.Brightness = 5 -- seberapa terang
+	light.Range = 20 -- radius cahaya
+	light.Shadows = true
+	light.Parent = hrp
 
-		-- teleport jauh dulu
-		char:MoveTo(Vector3.new(-25.95, 84, 3537.55))
-		-- task.wait(0.15)
-
-		-- buat seat invisible
-		local Seat = Instance.new("Seat")
-		Seat.Name = "invischair"
-		Seat.Anchored = false
-		Seat.CanCollide = false
-		Seat.Transparency = 1
-		Seat.Position = Vector3.new(-25.95, 84, 3537.55)
-		Seat.Parent = workspace
-
-		-- weld seat ke torso/UpperTorso
-		local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-		if torso then
-			local Weld = Instance.new("Weld")
-			Weld.Part0 = Seat
-			Weld.Part1 = torso
-			Weld.Parent = Seat
-		end
-
-		-- balikin kursi ke posisi awal
-		Seat.CFrame = savedpos
-
-		-- set transparansi
-		setTransparency(char, true)
-	end
-
-	return pilActive -- penting! biar warna tombol konsisten
+	lightRef = light
+	pilActive = true
 end
 
--- contoh binding ke tombol
+-- disable glow
+local function disablePIL()
+	if lightRef and lightRef.Parent then
+		lightRef:Destroy()
+	end
+	lightRef = nil
+	pilActive = false
+end
+
+-- toggle
+local function togglePIL()
+	if pilActive then
+		disablePIL()
+	else
+		enablePIL()
+	end
+	return pilActive
+end
+
+-- tombol binding
 buttonObjects["PIL"].MouseButton1Click:Connect(function()
 	local active = togglePIL()
 	buttonObjects["PIL"].BackgroundColor3 =
 		active and Color3.fromRGB(70,170,70) or Color3.fromRGB(50,50,50)
+end)
+
+-- respawn handling
+Players.LocalPlayer.CharacterAdded:Connect(function()
+	if pilActive then
+		task.wait(1)
+		enablePIL()
+	end
 end)
 
 -- ==================================
