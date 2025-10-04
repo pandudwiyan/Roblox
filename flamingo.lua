@@ -1151,25 +1151,23 @@ function removeFlag(target)
 	end
 end
 
--- [6] Mimic
--- ====== MIMIC: realtime sync gerakan + animasi target player/character ======
+-- [6] Mimic (Follow Behind Mode)
+-- ====== MIMIC: selalu menempel di belakang target 5 stud & menghadap sama ======
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local mimicConn
-local animConn
 local lastMimicTarget = nil
 
--- Stop mimic (dipakai juga saat respawn)
+-- Stop mimic (juga dipanggil saat respawn)
 local function stopMimic()
 	if mimicConn then mimicConn:Disconnect() mimicConn=nil end
-	if animConn then animConn:Disconnect() animConn=nil end
 	lastMimicTarget = nil
 	print("Mimic OFF")
 end
 
--- Toggle mimic realtime
+-- Toggle mimic realtime (follow belakang)
 local function mimicPlayer(target, buttonRef)
 	-- OFF kalau sudah aktif
 	if mimicConn then
@@ -1198,14 +1196,12 @@ local function mimicPlayer(target, buttonRef)
 	end
 
 	local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local myHum = myChar:WaitForChild("Humanoid")
 	local myHRP = myChar:WaitForChild("HumanoidRootPart")
-	local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
 	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 
 	lastMimicTarget = targetChar
 
-	-- Sync posisi + gerakan
+	-- Sync posisi + arah secara realtime
 	mimicConn = RunService.Heartbeat:Connect(function()
 		if not lastMimicTarget or not targetChar.Parent then
 			stopMimic()
@@ -1214,39 +1210,20 @@ local function mimicPlayer(target, buttonRef)
 		end
 
 		if targetHRP and myHRP then
-			-- offset 2 stud ke kanan supaya tidak tabrakan
-			myHRP.CFrame = targetHRP.CFrame * CFrame.new(2,0,0)
-		end
-
-		if targetHum and myHum then
-			myHum:Move(targetHum.MoveDirection, false)
-			myHum.Jump = targetHum.Jump
+			-- selalu 5 stud di belakang, menghadap ke arah target
+			local behindCF = targetHRP.CFrame * CFrame.new(0, 0, 5)
+			myHRP.CFrame = CFrame.new(behindCF.Position, behindCF.Position + targetHRP.CFrame.LookVector)
 		end
 	end)
-
-	-- Sync animasi (clone track yang dimainkan target)
-	if targetHum and targetHum:FindFirstChild("Animator") and myHum:FindFirstChild("Animator") then
-		local tAnimator = targetHum.Animator
-		local mAnimator = myHum.Animator
-
-		animConn = tAnimator.AnimationPlayed:Connect(function(track)
-			local ok, newTrack = pcall(function()
-				return mAnimator:LoadAnimation(track.Animation)
-			end)
-			if ok and newTrack then
-				newTrack:Play()
-			end
-		end)
-	end
 
 	if buttonRef then buttonRef.Text = "Unmimic" end
 	print("Mimic ON ke", targetChar.Name)
 	return true
 end
 
--- Saat respawn, matikan mimic
+-- Saat respawn, otomatis matikan mimic
 LocalPlayer.CharacterAdded:Connect(function()
-	if mimicConn or animConn then
+	if mimicConn then
 		stopMimic()
 	end
 end)
