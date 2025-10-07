@@ -1162,13 +1162,26 @@ local lastMimicTarget = nil
 
 -- Stop mimic (juga dipanggil saat respawn)
 local function stopMimic()
-	if mimicConn then mimicConn:Disconnect() mimicConn=nil end
+	if mimicConn then
+		mimicConn:Disconnect()
+		mimicConn = nil
+	end
 	lastMimicTarget = nil
-	print("Mimic OFF")
+
+	-- aktifkan kembali autorotate setelah mimic dimatikan
+	local myChar = LocalPlayer.Character
+	if myChar then
+		local myHum = myChar:FindFirstChildOfClass("Humanoid")
+		if myHum then
+			myHum.AutoRotate = true
+		end
+	end
+
+	print("✅ Mimic OFF")
 end
 
 -- Toggle mimic realtime (follow belakang)
-local function mimicPlayer(target, buttonRef)
+function mimicPlayer(target, buttonRef)
 	-- OFF kalau sudah aktif
 	if mimicConn then
 		stopMimic()
@@ -1191,13 +1204,19 @@ local function mimicPlayer(target, buttonRef)
 		targetChar = targetPlayer.Character
 	end
 	if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
-		warn("Mimic: target tidak valid")
+		warn("⚠️ Mimic: target tidak valid")
 		return false
 	end
 
 	local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local myHRP = myChar:WaitForChild("HumanoidRootPart")
-	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+	local myHum = myChar:FindFirstChildOfClass("Humanoid")
+
+	-- hentikan gerakan dan matikan autorotate supaya tidak bentrok
+	if myHum then
+		myHum:Move(Vector3.zero, false)
+		myHum.AutoRotate = false
+	end
 
 	lastMimicTarget = targetChar
 
@@ -1209,6 +1228,7 @@ local function mimicPlayer(target, buttonRef)
 			return
 		end
 
+		local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 		if targetHRP and myHRP then
 			-- selalu 5 stud di belakang, menghadap ke arah target
 			local behindCF = targetHRP.CFrame * CFrame.new(0, 0, 5)
@@ -1217,7 +1237,7 @@ local function mimicPlayer(target, buttonRef)
 	end)
 
 	if buttonRef then buttonRef.Text = "Unmimic" end
-	print("Mimic ON ke", targetChar.Name)
+	print("✅ Mimic ON → mengikuti belakang:", targetChar.Name)
 	return true
 end
 
