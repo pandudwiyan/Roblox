@@ -1,4 +1,4 @@
--- Floating UI + Infinite Jump (Natural Jump, works for PC & Mobile)
+-- Floating UI + Infinite Jump + Speed Boost (Natural Jump, works for PC & Mobile)
 -- Client-Side Only - LocalScript di StarterPlayerScripts
 
 local Players = game:GetService("Players")
@@ -12,12 +12,12 @@ local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FloatingUI"
 screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true -- Memastikan posisi GUI konsisten
+screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
 local panel = Instance.new("Frame")
 panel.Name = "MainPanel"
-panel.Size = UDim2.new(0, 160, 0, 60)
+panel.Size = UDim2.new(0, 235, 0, 60)
 panel.Position = UDim2.new(0.05, 0, 0.7, 0)
 panel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 panel.BackgroundTransparency = 0.3
@@ -66,6 +66,20 @@ jumpBtn.TextSize = 14
 jumpBtn.Parent = panel
 local jc = Instance.new("UICorner", jumpBtn)
 jc.CornerRadius = UDim.new(0,8)
+
+-- Speed Button
+local speedBtn = Instance.new("TextButton")
+speedBtn.Name = "SpeedButton"
+speedBtn.Size = UDim2.new(0, 70, 0, 28)
+speedBtn.Position = UDim2.new(0, 156, 0, 28)
+speedBtn.Text = "Speed"
+speedBtn.BackgroundColor3 = Color3.fromRGB(120,120,120)
+speedBtn.TextColor3 = Color3.new(1,1,1)
+speedBtn.Font = Enum.Font.SourceSans
+speedBtn.TextSize = 14
+speedBtn.Parent = panel
+local sc = Instance.new("UICorner", speedBtn)
+sc.CornerRadius = UDim.new(0,8)
 
 -- Selection Menu
 local selectionMenu = Instance.new("Frame")
@@ -122,13 +136,26 @@ closeCorner.CornerRadius = UDim.new(0, 4)
 -- Attribute system
 if jumpBtn:GetAttribute("Active") == nil then jumpBtn:SetAttribute("Active", false) end
 if visionBtn:GetAttribute("Active") == nil then visionBtn:SetAttribute("Active", false) end
+if speedBtn:GetAttribute("SpeedLevel") == nil then speedBtn:SetAttribute("SpeedLevel", 0) end
 
 -- Vision mode variables
 local originalTransparency = {}
 local originalColors = {}
 local selectedObject = nil
 local selectedObjectOriginalColor = nil
-local broughtObjects = {} -- Menyimpan posisi asli objek yang sudah di-"bring"
+local broughtObjects = {}
+
+-- Speed system variables
+-- REVISI: Kita tidak lagi memerlukan variabel defaultWalkSpeed yang statis.
+-- local defaultWalkSpeed = 16
+local speedMultipliers = {1, 2, 4, 8, 16} -- Multiplier untuk setiap level (1x, 2x, 4x, 8x, 16x)
+local speedColors = {
+	Color3.fromRGB(120,120,120), -- Off (abu-abu)
+	Color3.fromRGB(0,200,0),     -- 2x (hijau)
+	Color3.fromRGB(255,255,0),    -- 4x (kuning)
+	Color3.fromRGB(128,0,128),    -- 8x (ungu)
+	Color3.fromRGB(255,0,0)       -- 16x (merah)
+}
 
 -- Double-click detection variables
 local lastClickTime = 0
@@ -136,10 +163,16 @@ local lastClickedObject = nil
 local doubleClickTimeLimit = 0.5
 
 local function applyButtonVisual(btn)
-	btn.BackgroundColor3 = (btn:GetAttribute("Active") and Color3.fromRGB(0,200,0)) or Color3.fromRGB(120,120,120)
+	if btn == speedBtn then
+		local level = btn:GetAttribute("SpeedLevel") or 0
+		btn.BackgroundColor3 = speedColors[level + 1]
+	else
+		btn.BackgroundColor3 = (btn:GetAttribute("Active") and Color3.fromRGB(0,200,0)) or Color3.fromRGB(120,120,120)
+	end
 end
 applyButtonVisual(jumpBtn)
 applyButtonVisual(visionBtn)
+applyButtonVisual(speedBtn)
 
 local function toggleButton(btn)
 	local active = not (btn:GetAttribute("Active") or false)
@@ -148,7 +181,7 @@ local function toggleButton(btn)
 	return active
 end
 
--- Drag system (mobile + pc)
+-- Drag system
 local dragging, dragInput, dragStart, startPos
 local function updateDrag(input)
 	local delta = input.Position - dragStart
@@ -175,7 +208,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 ------------------------------------------------------------
--- INFINITE JUMP SYSTEM (natural height)
+-- INFINITE JUMP SYSTEM
 ------------------------------------------------------------
 local function setupInfiniteJumpForCharacter(character)
 	local humanoid = character:WaitForChild("Humanoid")
@@ -201,6 +234,34 @@ local function setupInfiniteJumpForCharacter(character)
 			doJump()
 		end
 	end)
+end
+
+------------------------------------------------------------
+-- SPEED SYSTEM (REVISI TOTAL)
+------------------------------------------------------------
+local function setupSpeedForCharacter(character)
+	local humanoid = character:WaitForChild("Humanoid")
+
+	-- REVISI: Simpan kecepatan default asli dari map ke dalam Attribute Humanoid.
+	-- Ini hanya dilakukan sekali saat karakter dibuat.
+	if not humanoid:GetAttribute("OriginalWalkSpeed") then
+		humanoid:SetAttribute("OriginalWalkSpeed", humanoid.WalkSpeed)
+	end
+
+	-- Fungsi untuk memperbarui kecepatan berdasarkan level tombol
+	local function updateSpeed()
+		local level = speedBtn:GetAttribute("SpeedLevel") or 0
+		local multiplier = speedMultipliers[level + 1]
+		-- REVISI: Ambil kecepatan asli yang sudah kita simpan.
+		local originalSpeed = humanoid:GetAttribute("OriginalWalkSpeed")
+		humanoid.WalkSpeed = originalSpeed * multiplier
+	end
+
+	-- Update kecepatan saat level speed berubah
+	speedBtn:GetAttributeChangedSignal("SpeedLevel"):Connect(updateSpeed)
+
+	-- Set kecepatan awal saat karakter dimuat
+	updateSpeed()
 end
 
 ------------------------------------------------------------
@@ -252,7 +313,6 @@ local function toggleVisionMode()
 	end
 end
 
--- Object selection with double-click
 local function onObjectClick(object)
 	if not visionBtn:GetAttribute("Active") then return end
 	if not object:IsA("BasePart") then return end
@@ -274,7 +334,6 @@ local function onObjectClick(object)
 		selectionMenu.Visible = true
 		selectionMenu.Position = UDim2.new(0, panel.AbsolutePosition.X + panel.AbsoluteSize.X + 10, 0, panel.AbsolutePosition.Y)
 
-		-- Perbarui teks tombol "Bring" berdasarkan status objek
 		if broughtObjects[selectedObject] then
 			bringBtn.Text = "Unbring"
 		else
@@ -287,18 +346,13 @@ local function onObjectClick(object)
 	end
 end
 
--- Bring/Unbring object (FUNGSI YANG DIPERBARUI)
 local function bringObject()
 	if not selectedObject or not selectedObject.Parent then return end
 
-	-- Periksa apakah objek sudah pernah di-"bring" sebelumnya
 	if broughtObjects[selectedObject] then
-		-- Jika ya, kembalikan ke posisi asal (Unbring)
 		selectedObject.CFrame = broughtObjects[selectedObject]
-		-- Hapus dari penyimpanan untuk mereset statusnya
 		broughtObjects[selectedObject] = nil
 	else
-		-- Jika tidak, simpan posisi sekarang dan pindahkan ke depan (Bring)
 		broughtObjects[selectedObject] = selectedObject.CFrame
 
 		local character = player.Character
@@ -311,7 +365,6 @@ local function bringObject()
 	closeSelection()
 end
 
--- Delete object
 local function deleteObject()
 	if not selectedObject or not selectedObject.Parent then return end
 
@@ -327,7 +380,6 @@ local function deleteObject()
 	selectionMenu.Visible = false
 end
 
--- Close selection
 local function closeSelection()
 	if selectedObject and selectedObject.Parent then
 		selectedObject.Color = selectedObjectOriginalColor
@@ -337,12 +389,10 @@ local function closeSelection()
 	selectionMenu.Visible = false
 end
 
--- Connect button events
 bringBtn.MouseButton1Click:Connect(bringObject)
 deleteBtn.MouseButton1Click:Connect(deleteObject)
 closeBtn.MouseButton1Click:Connect(closeSelection)
 
--- Object click detection
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -359,11 +409,13 @@ end)
 player.CharacterAdded:Connect(function(char)
 	task.wait(0.5)
 	setupInfiniteJumpForCharacter(char)
+	setupSpeedForCharacter(char) -- Memanggil fungsi speed yang sudah direvisi
 end)
 
 if player.Character then
 	task.delay(0.5, function()
 		setupInfiniteJumpForCharacter(player.Character)
+		setupSpeedForCharacter(player.Character)
 	end)
 end
 
@@ -379,17 +431,49 @@ end)
 
 visionBtn.MouseButton1Click:Connect(toggleVisionMode)
 
+-- Speed button action
+speedBtn.MouseButton1Click:Connect(function()
+	local currentLevel = speedBtn:GetAttribute("SpeedLevel") or 0
+	local newLevel = (currentLevel + 1) % 5
+	speedBtn:SetAttribute("SpeedLevel", newLevel)
+
+	applyButtonVisual(speedBtn)
+
+	-- REVISI: Tidak perlu menghitung di sini lagi, karena setupSpeedForCharacter sudah mendengarkan perubahan.
+	-- Tapi untuk memastikan kecepatan berubah instan, kita bisa memanggilnya langsung.
+	if player.Character and player.Character:FindFirstChild("Humanoid") then
+		local humanoid = player.Character.Humanoid
+		local originalSpeed = humanoid:GetAttribute("OriginalWalkSpeed")
+		if originalSpeed then
+			local multiplier = speedMultipliers[newLevel + 1]
+			humanoid.WalkSpeed = originalSpeed * multiplier
+		end
+	end
+end)
+
 -- Save vision state when player leaves
 game:GetService("Players").PlayerRemoving:Connect(function(plr)
 	if plr == player then
 		player:SetAttribute("VisionActive", visionBtn:GetAttribute("Active"))
+		player:SetAttribute("SpeedLevel", speedBtn:GetAttribute("SpeedLevel"))
 	end
 end)
 
--- Restore vision state when player joins
 if player:GetAttribute("VisionActive") then
 	if player:GetAttribute("VisionActive") == true then
 		task.wait(1)
 		toggleVisionMode()
+	end
+end
+
+if player:GetAttribute("SpeedLevel") then
+	local savedLevel = player:GetAttribute("SpeedLevel")
+	if savedLevel and savedLevel >= 0 and savedLevel <= 4 then
+		task.wait(1)
+		speedBtn:SetAttribute("SpeedLevel", savedLevel)
+		applyButtonVisual(speedBtn)
+		if player.Character and player.Character:FindFirstChild("Humanoid") then
+			setupSpeedForCharacter(player.Character)
+		end
 	end
 end
