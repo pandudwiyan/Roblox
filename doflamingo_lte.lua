@@ -1,5 +1,4 @@
--- Floating UI + Infinite Jump
--- Client-Side Only - LocalScript
+-- Floating Tools UI (PC + Mobile)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -9,14 +8,13 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -------------------------------------------------
--- GUI SETUP
+-- GUI
 -------------------------------------------------
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FloatingUI"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = playerGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "ToolsUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
 
 local panel = Instance.new("Frame")
 panel.Size = UDim2.new(0,160,0,60)
@@ -24,15 +22,15 @@ panel.Position = UDim2.new(0.05,0,0.7,0)
 panel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 panel.BackgroundTransparency = 0.3
 panel.Active = true
-panel.Parent = screenGui
+panel.Parent = gui
 
 Instance.new("UICorner",panel).CornerRadius = UDim.new(0,12)
 
 local title = Instance.new("TextLabel")
-title.Text = "Tools"
 title.Size = UDim2.new(1,-10,0,20)
 title.Position = UDim2.new(0,5,0,3)
 title.BackgroundTransparency = 1
+title.Text = "Tools"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.SourceSansBold
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -40,13 +38,12 @@ title.TextSize = 14
 title.Parent = panel
 
 -------------------------------------------------
--- BUTTONS
+-- BUTTON CREATOR
 -------------------------------------------------
 
-local function createButton(name,text,x)
+local function createButton(text,x)
 
 	local btn = Instance.new("TextButton")
-	btn.Name = name
 	btn.Size = UDim2.new(0,70,0,28)
 	btn.Position = UDim2.new(0,x,0,28)
 	btn.Text = text
@@ -56,42 +53,43 @@ local function createButton(name,text,x)
 	btn.TextSize = 14
 	btn.Parent = panel
 
-	Instance.new("UICorner",btn).CornerRadius = UDim.new(0,8)
+	Instance.new("UICorner",btn)
 
 	return btn
+
 end
 
-local visionBtn = createButton("VisionButton","Vision",8)
-local jumpBtn = createButton("JumpButton","Jump",82)
+local visionBtn = createButton("Vision",8)
+local jumpBtn = createButton("Jump",82)
 
 -------------------------------------------------
 -- SELECTION MENU
 -------------------------------------------------
 
-local selectionMenu = Instance.new("Frame")
-selectionMenu.Size = UDim2.new(0,150,0,160)
-selectionMenu.BackgroundColor3 = Color3.fromRGB(40,40,40)
-selectionMenu.BorderSizePixel = 0
-selectionMenu.Visible = false
-selectionMenu.Parent = screenGui
+local menu = Instance.new("Frame")
+menu.Size = UDim2.new(0,150,0,160)
+menu.BackgroundColor3 = Color3.fromRGB(40,40,40)
+menu.Visible = false
+menu.Parent = gui
 
-Instance.new("UICorner",selectionMenu).CornerRadius = UDim.new(0,8)
+Instance.new("UICorner",menu)
 
 local function createMenuButton(text,y,color)
 
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0,130,0,25)
-	btn.Position = UDim2.new(0,10,0,y)
-	btn.Text = text
-	btn.BackgroundColor3 = color
-	btn.TextColor3 = Color3.new(1,1,1)
-	btn.Font = Enum.Font.SourceSans
-	btn.TextSize = 14
-	btn.Parent = selectionMenu
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(0,130,0,25)
+	b.Position = UDim2.new(0,10,0,y)
+	b.Text = text
+	b.BackgroundColor3 = color
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.SourceSans
+	b.TextSize = 14
+	b.Parent = menu
 
-	Instance.new("UICorner",btn).CornerRadius = UDim.new(0,4)
+	Instance.new("UICorner",b)
 
-	return btn
+	return b
+
 end
 
 local bringBtn = createMenuButton("Bring",10,Color3.fromRGB(0,120,215))
@@ -104,62 +102,70 @@ local deleteBtn = createMenuButton("Delete",130,Color3.fromRGB(215,0,0))
 -- VARIABLES
 -------------------------------------------------
 
-visionBtn:SetAttribute("Active",false)
-jumpBtn:SetAttribute("Active",false)
+local selectedObject
+local selectedOriginalColor
+
+local copiedObject
+local broughtObjects = {}
+
+local lastClick = 0
+local lastObject
 
 local originalTransparency = {}
 local originalColors = {}
 
-local selectedObject = nil
-local selectedObjectOriginalColor = nil
-
-local broughtObjects = {}
-local copiedObject = nil
-
 -------------------------------------------------
--- BUTTON VISUAL
+-- BUTTON TOGGLE
 -------------------------------------------------
 
-local function toggleButton(btn)
+local function toggle(btn)
 
-	local active = not btn:GetAttribute("Active")
-	btn:SetAttribute("Active",active)
+	local on = not btn:GetAttribute("Active")
+	btn:SetAttribute("Active",on)
 
 	btn.BackgroundColor3 =
-		active and Color3.fromRGB(0,200,0)
+		on and Color3.fromRGB(0,200,0)
 		or Color3.fromRGB(120,120,120)
 
-	return active
+	return on
 
 end
 
 -------------------------------------------------
--- DRAG PANEL
+-- DRAG UI
 -------------------------------------------------
 
-local dragging,dragStart,startPos
+local dragging
+local dragStart
+local startPos
 
 panel.InputBegan:Connect(function(input)
 
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
 		dragging = true
 		dragStart = input.Position
 		startPos = panel.Position
+
 	end
 
 end)
 
 panel.InputEnded:Connect(function(input)
 
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
 		dragging = false
+
 	end
 
 end)
 
 UserInputService.InputChanged:Connect(function(input)
 
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+	if dragging then
 
 		local delta = input.Position - dragStart
 
@@ -178,14 +184,14 @@ end)
 -- INFINITE JUMP
 -------------------------------------------------
 
-local function setupInfiniteJump(character)
+local function setupJump(char)
 
-	local humanoid = character:WaitForChild("Humanoid")
+	local hum = char:WaitForChild("Humanoid")
 
 	UserInputService.JumpRequest:Connect(function()
 
 		if jumpBtn:GetAttribute("Active") then
-			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
 		end
 
 	end)
@@ -193,14 +199,14 @@ local function setupInfiniteJump(character)
 end
 
 -------------------------------------------------
--- VISION MODE
+-- VISION
 -------------------------------------------------
 
 local function toggleVision()
 
-	local active = toggleButton(visionBtn)
+	local on = toggle(visionBtn)
 
-	if active then
+	if on then
 
 		for _,obj in pairs(Workspace:GetDescendants()) do
 
@@ -233,38 +239,38 @@ local function toggleVision()
 			end
 		end
 
-		selectionMenu.Visible = false
+		menu.Visible = false
 
 	end
 
 end
 
 -------------------------------------------------
--- OBJECT CLICK
+-- OBJECT SELECT
 -------------------------------------------------
 
-local lastClickTime = 0
-local lastObject = nil
-
-local function onObjectClick(object)
+local function selectObject(obj)
 
 	if not visionBtn:GetAttribute("Active") then return end
-	if not object:IsA("BasePart") then return end
+	if not obj then return end
+	if not obj:IsA("BasePart") then return end
 
 	local time = tick()
 
-	if object == lastObject and time-lastClickTime < 0.5 then
+	if obj == lastObject and time-lastClick < 0.5 then
 
 		if selectedObject then
-			selectedObject.Color = selectedObjectOriginalColor
+			selectedObject.Color = selectedOriginalColor
 		end
 
-		selectedObject = object
-		selectedObjectOriginalColor = object.Color
-		object.Color = Color3.fromRGB(255,0,0)
+		selectedObject = obj
+		selectedOriginalColor = obj.Color
 
-		selectionMenu.Visible = true
-		selectionMenu.Position = UDim2.new(
+		obj.Color = Color3.fromRGB(255,0,0)
+
+		menu.Visible = true
+
+		menu.Position = UDim2.new(
 			0,
 			panel.AbsolutePosition.X + panel.AbsoluteSize.X + 10,
 			0,
@@ -278,17 +284,56 @@ local function onObjectClick(object)
 		end
 
 	else
-		lastObject = object
-		lastClickTime = time
+		lastObject = obj
+		lastClick = time
 	end
 
 end
 
 -------------------------------------------------
--- BRING / UNBRING
+-- CLICK PC
 -------------------------------------------------
 
-local function bringObject()
+UserInputService.InputBegan:Connect(function(input,gp)
+
+	if gp then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+		local mouse = player:GetMouse()
+
+		if mouse.Target then
+			selectObject(mouse.Target)
+		end
+
+	end
+
+end)
+
+-------------------------------------------------
+-- TAP MOBILE
+-------------------------------------------------
+
+UserInputService.TouchTapInWorld:Connect(function(pos,processed)
+
+	if processed then return end
+
+	local cam = Workspace.CurrentCamera
+	local ray = cam:ViewportPointToRay(pos.X,pos.Y)
+
+	local result = Workspace:Raycast(ray.Origin,ray.Direction*500)
+
+	if result then
+		selectObject(result.Instance)
+	end
+
+end)
+
+-------------------------------------------------
+-- ACTIONS
+-------------------------------------------------
+
+bringBtn.MouseButton1Click:Connect(function()
 
 	if not selectedObject then return end
 
@@ -312,130 +357,72 @@ local function bringObject()
 
 	end
 
-end
+end)
 
--------------------------------------------------
--- TELEPORT PLAYER
--------------------------------------------------
-
-local function teleportToObject()
+teleportBtn.MouseButton1Click:Connect(function()
 
 	if not selectedObject then return end
 
-	local char = player.Character
-	if not char then return end
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if hrp then
+		hrp.CFrame = selectedObject.CFrame + Vector3.new(0,5,0)
+	end
 
-	local offset = selectedObject.Size.Y/2 + 3
+end)
 
-	hrp.CFrame = CFrame.new(
-		selectedObject.Position + Vector3.new(0,offset,0)
-	)
+copyBtn.MouseButton1Click:Connect(function()
 
-end
+	if selectedObject then
+		copiedObject = selectedObject:Clone()
+	end
 
--------------------------------------------------
--- COPY
--------------------------------------------------
+end)
 
-local function copyObject()
-
-	if not selectedObject then return end
-
-	copiedObject = selectedObject:Clone()
-
-end
-
--------------------------------------------------
--- PASTE
--------------------------------------------------
-
-local function pasteObject()
+pasteBtn.MouseButton1Click:Connect(function()
 
 	if not copiedObject then return end
 
-	local char = player.Character
-	if not char then return end
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if hrp then
 
-	local clone = copiedObject:Clone()
-	clone.Parent = Workspace
+		local clone = copiedObject:Clone()
+		clone.Parent = Workspace
+		clone.CFrame = hrp.CFrame + hrp.CFrame.LookVector*5
 
-	clone.CFrame = hrp.CFrame + hrp.CFrame.LookVector*5
+	end
 
-end
+end)
 
--------------------------------------------------
--- DELETE
--------------------------------------------------
+deleteBtn.MouseButton1Click:Connect(function()
 
-local function deleteObject()
+	if selectedObject then
+		selectedObject:Destroy()
+		menu.Visible = false
+	end
 
-	if not selectedObject then return end
-
-	selectedObject:Destroy()
-	selectedObject = nil
-	selectionMenu.Visible = false
-
-end
+end)
 
 -------------------------------------------------
 -- EVENTS
 -------------------------------------------------
 
-bringBtn.MouseButton1Click:Connect(bringObject)
-teleportBtn.MouseButton1Click:Connect(teleportToObject)
-copyBtn.MouseButton1Click:Connect(copyObject)
-pasteBtn.MouseButton1Click:Connect(pasteObject)
-deleteBtn.MouseButton1Click:Connect(deleteObject)
-
 visionBtn.MouseButton1Click:Connect(toggleVision)
 
 jumpBtn.MouseButton1Click:Connect(function()
 
-	local on = toggleButton(jumpBtn)
+	local on = toggle(jumpBtn)
 
 	if on and player.Character then
-		setupInfiniteJump(player.Character)
+		setupJump(player.Character)
 	end
 
 end)
 
-UserInputService.InputBegan:Connect(function(input,gp)
-
-	if gp then return end
-
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-
-		local mouse = player:GetMouse()
-
-		if mouse.Target then
-			onObjectClick(mouse.Target)
-		end
-
-	end
-
-end)
-
--------------------------------------------------
--- CHARACTER SETUP
--------------------------------------------------
-
-player.CharacterAdded:Connect(function(char)
+player.CharacterAdded:Connect(function(c)
 
 	task.wait(0.5)
-	setupInfiniteJump(char)
+	setupJump(c)
 
 end)
-
-if player.Character then
-
-	task.delay(0.5,function()
-		setupInfiniteJump(player.Character)
-	end)
-
-end
