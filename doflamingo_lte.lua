@@ -1,4 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 4 (Compact & Camera Relative)
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 6
+-- Fix: Teleport preserves player rotation (LookVector)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -19,7 +20,7 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0,250,0,65)
+panel.Size = UDim2.new(0,250,0,95) 
 panel.Position = UDim2.new(0.05,0,0.7,0)
 panel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 panel.BackgroundTransparency = 0.3
@@ -43,10 +44,10 @@ title.Parent = panel
 -- BUTTON CREATOR
 -------------------------------------------------
 
-local function createButton(text,x)
+local function createButton(text,x,y)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0,70,0,28)
-	btn.Position = UDim2.new(0,x,0,28)
+	btn.Position = UDim2.new(0,x,0,y or 28)
 	btn.Text = text
 	btn.BackgroundColor3 = Color3.fromRGB(120,120,120)
 	btn.TextColor3 = Color3.new(1,1,1)
@@ -57,16 +58,22 @@ local function createButton(text,x)
 	return btn
 end
 
+-- Baris 1
 local visionBtn = createButton("Vision",10)
 local jumpBtn = createButton("Jump",90)
 local ghostBtn = createButton("Ghost",170)
+
+-- Baris 2
+local tpMarkBtn = createButton("Teleport", 10, 60)
+tpMarkBtn.Size = UDim2.new(0, 230, 0, 28)
+tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
 
 -------------------------------------------------
 -- SELECTION MENU
 -------------------------------------------------
 
 local menu = Instance.new("Frame")
-menu.Size = UDim2.new(0,150,0,70)
+menu.Size = UDim2.new(0,150,0,140) 
 menu.BackgroundColor3 = Color3.fromRGB(40,40,40)
 menu.Visible = false
 menu.Parent = gui
@@ -89,6 +96,8 @@ end
 
 local bringBtn = createMenuButton("Bring",10,Color3.fromRGB(0,120,215))
 local teleportBtn = createMenuButton("Teleport",40,Color3.fromRGB(0,170,0))
+local markBtn = createMenuButton("Mark",70,Color3.fromRGB(100, 0, 150))
+local deleteBtn = createMenuButton("Delete",100,Color3.fromRGB(255, 0, 0))
 
 -------------------------------------------------
 -- VARIABLES
@@ -107,6 +116,12 @@ local objectLabels = {}
 local ghostSphere = nil
 local ghostConnections = {}
 local mobileControls = nil
+
+-- Variabel Mark & Teleport
+local markedCFrame = nil 
+local tempMarkCFrame = nil 
+local isUndoMode = false 
+local undoThread = nil 
 
 -------------------------------------------------
 -- BUTTON TOGGLE
@@ -171,10 +186,9 @@ local function setupJump(char)
 end
 
 -------------------------------------------------
--- GHOST SPHERE FEATURE (REV 4)
+-- GHOST SPHERE FEATURE
 -------------------------------------------------
 
--- Fungsi Kontrol Mobile (Ukuran Lebih Kecil & Simetris)
 local function createMobileControls()
 	local frame = Instance.new("Frame")
 	frame.Name = "MobileGhostControls"
@@ -190,25 +204,21 @@ local function createMobileControls()
 		b.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 		b.BackgroundTransparency = 0.4
 		b.TextColor3 = Color3.new(1,1,1)
-		b.TextSize = 24 -- Ukuran font disesuaikan
+		b.TextSize = 24 
 		b.Font = Enum.Font.SourceSansBold
 		b.BorderSizePixel = 0
 		b.Parent = frame
-		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10) -- Lebih bulat
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
 		return b
 	end
 
-	-- Ukuran Tombol Baru: 45x45 (Lebih kecil)
 	local btnSize = UDim2.new(0, 45, 0, 45)
 
-	-- D-PAD KIRI (Simetris)
-	-- Tengah horizontal di X=45 (antara 20 dan 70)
-	local fwd = mBtn("▲", btnSize, UDim2.new(0, 60, 1, -140)) -- Atas (Maju)
-	local lft = mBtn("◄", btnSize, UDim2.new(0, 20, 1, -100))  -- Kiri
-	local rgt = mBtn("►", btnSize, UDim2.new(0, 100, 1, -100))  -- Kanan
-	local bck = mBtn("▼", btnSize, UDim2.new(0, 60, 1, -60))  -- Bawah (Mundur)
+	local fwd = mBtn("▲", btnSize, UDim2.new(0, 60, 1, -140))
+	local lft = mBtn("◄", btnSize, UDim2.new(0, 20, 1, -100))
+	local rgt = mBtn("►", btnSize, UDim2.new(0, 100, 1, -100))
+	local bck = mBtn("▼", btnSize, UDim2.new(0, 60, 1, -60))
 
-	-- KANAN (Naik/Turun)
 	local upB = mBtn("UP", btnSize, UDim2.new(1, -145, 1, -105))
 	local dnB = mBtn("DN", btnSize, UDim2.new(1, -145, 1, -60))
 
@@ -227,7 +237,6 @@ local function toggleGhost()
 	local hum = char:FindFirstChild("Humanoid")
 
 	if on then
-		-- 1. Buat Sphere
 		ghostSphere = Instance.new("Part")
 		ghostSphere.Name = player.Name .. "_eye"
 		ghostSphere.Shape = Enum.PartType.Ball
@@ -244,7 +253,6 @@ local function toggleGhost()
 		end
 		ghostSphere.Parent = Workspace
 
-		-- 2. Kamera & Player State
 		Workspace.CurrentCamera.CameraSubject = ghostSphere
 
 		for _, part in pairs(char:GetDescendants()) do
@@ -254,13 +262,10 @@ local function toggleGhost()
 		end
 		if hum then hum.PlatformStand = true end
 
-		-- 3. Logic Gerakan
 		local keysPressed = {}
-		-- Menggunakan nama variabel yang lebih jelas
 		local moveDir = { forward = 0, strafe = 0, vertical = 0 }
 		local SPEED = 2
 
-		-- Input PC
 		local inputCon = UserInputService.InputBegan:Connect(function(input, gp)
 			if gp then return end
 			keysPressed[input.KeyCode] = true
@@ -272,7 +277,6 @@ local function toggleGhost()
 		end)
 		table.insert(ghostConnections, inputEndCon)
 
-		-- Input Mobile
 		if UserInputService.TouchEnabled then
 			mobileControls = createMobileControls()
 
@@ -295,37 +299,27 @@ local function toggleGhost()
 			setupMobileBtn(mobileControls.Dn, "vertical", -1)
 		end
 
-		-- Loop Gerakan (Camera Relative)
 		local renderCon = RunService.RenderStepped:Connect(function()
 			if not ghostSphere or not ghostSphere.Parent then return end
 
 			local cam = Workspace.CurrentCamera
 			local finalMove = Vector3.new(0,0,0)
 
-			-- Dapatkan vektor kamera
-			-- Perhatian: LookVector mengarah ke mana kamera melihat
 			local camCF = cam.CFrame
 			local camLook = camCF.LookVector
 			local camRight = camCF.RightVector
-			local camUp = camCF.UpVector -- Untuk gerakan naik/turun relatif kamera
 
-			-- Input PC (Tombol WASD/Space/Q)
 			if keysPressed[Enum.KeyCode.W] then finalMove = finalMove + camLook end
 			if keysPressed[Enum.KeyCode.S] then finalMove = finalMove - camLook end
 			if keysPressed[Enum.KeyCode.D] then finalMove = finalMove + camRight end
 			if keysPressed[Enum.KeyCode.A] then finalMove = finalMove - camRight end
-			if keysPressed[Enum.KeyCode.Space] then finalMove = finalMove + Vector3.new(0,1,0) end -- World Up
+			if keysPressed[Enum.KeyCode.Space] then finalMove = finalMove + Vector3.new(0,1,0) end
 			if keysPressed[Enum.KeyCode.Q] then finalMove = finalMove - Vector3.new(0,1,0) end
 
-			-- Input Mobile (Gabungkan dengan PC)
-			-- Forward/Kedepan mengikuti kemana kamera menghadap (camLook)
 			finalMove = finalMove + (camLook * moveDir.forward)
-			-- Strafe/Kiri-Kanan mengikuti sumbu kanan kamera (camRight)
 			finalMove = finalMove + (camRight * moveDir.strafe)
-			-- Vertical/Atas-Bawah (Menggunakan World Up Vector agar intuitif)
 			finalMove = finalMove + (Vector3.new(0,1,0) * moveDir.vertical)
 
-			-- Terapkan Gerakan
 			if finalMove.Magnitude > 0 then
 				ghostSphere.CFrame = ghostSphere.CFrame + (finalMove * SPEED)
 			end
@@ -333,7 +327,6 @@ local function toggleGhost()
 		table.insert(ghostConnections, renderCon)
 
 	else
-		-- MATIKAN GHOST MODE
 		if ghostSphere then
 			ghostSphere:Destroy()
 			ghostSphere = nil
@@ -367,8 +360,10 @@ end
 ghostBtn.MouseButton1Click:Connect(toggleGhost)
 
 -------------------------------------------------
--- VISION
+-- VISION (Rainbow Player ESP)
 -------------------------------------------------
+
+local rainbowConnection = nil
 
 local function toggleVision()
 	local on = toggle(visionBtn)
@@ -376,13 +371,42 @@ local function toggleVision()
 	if on then
 		local processedPlayers = {} 
 
+		if rainbowConnection then rainbowConnection:Disconnect() end
+
+		rainbowConnection = RunService.RenderStepped:Connect(function()
+			for obj, label in pairs(objectLabels) do
+				if label and label.Parent then
+					local isPlayer = false
+					if obj:IsA("BasePart") then
+						local char = obj:FindFirstAncestorWhichIsA("Model")
+						if char and Players:GetPlayerFromCharacter(char) then
+							isPlayer = true
+						end
+					end
+
+					if isPlayer then
+						local hue = tick() % 5 / 5 
+						local txt = label:FindFirstChild("TextLabel")
+						if txt then
+							txt.TextColor3 = Color3.fromHSV(hue, 1, 1)
+						end
+					end
+				end
+			end
+		end)
+
 		for _,obj in pairs(Workspace:GetDescendants()) do
 			if obj:IsA("BasePart") then
 				originalTransparency[obj] = obj.Transparency
 				originalColors[obj] = obj.Color
 				obj.Transparency = 0
-				if obj.CanCollide then
-					obj.Color = Color3.fromRGB(0,255,0)
+
+				if obj:GetAttribute("Marked") then
+					obj.Color = Color3.fromRGB(0, 255, 255)
+				else
+					if obj.CanCollide then
+						obj.Color = Color3.fromRGB(0,255,0)
+					end
 				end
 
 				local characterModel = obj:FindFirstAncestorWhichIsA("Model")
@@ -402,7 +426,7 @@ local function toggleVision()
 							textLabel.Size = UDim2.new(1, 0, 1, 0)
 							textLabel.BackgroundTransparency = 1
 							textLabel.Text = labelText
-							textLabel.TextColor3 = Color3.new(1, 1, 1)
+							textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
 							textLabel.TextStrokeTransparency = 0
 							textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 							textLabel.Font = Enum.Font.SourceSansBold 
@@ -423,7 +447,7 @@ local function toggleVision()
 						textLabel.Size = UDim2.new(1, 0, 1, 0)
 						textLabel.BackgroundTransparency = 1
 						textLabel.Text = obj.Name
-						textLabel.TextColor3 = Color3.new(1, 1, 1)
+						textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 						textLabel.TextStrokeTransparency = 0
 						textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 						textLabel.Font = Enum.Font.SourceSans
@@ -435,6 +459,11 @@ local function toggleVision()
 			end
 		end
 	else
+		if rainbowConnection then
+			rainbowConnection:Disconnect()
+			rainbowConnection = nil
+		end
+
 		for obj,val in pairs(originalTransparency) do
 			if obj and obj.Parent then
 				obj.Transparency = val
@@ -468,11 +497,14 @@ local function selectObject(obj)
 
 	if obj == lastObject and time-lastClick < 0.5 then
 		if selectedObject then
-			selectedObject.Color = selectedOriginalColor
+			if selectedObject.Parent then
+				selectedObject.Color = Color3.fromRGB(0,255,0) 
+			end
 		end
 		selectedObject = obj
 		selectedOriginalColor = obj.Color
-		obj.Color = Color3.fromRGB(255,0,0)
+		obj.Color = Color3.fromRGB(255,0,0) 
+
 		menu.Visible = true
 		menu.Position = UDim2.new(
 			0,
@@ -485,6 +517,8 @@ local function selectObject(obj)
 		else
 			bringBtn.Text = "Bring"
 		end
+
+		markBtn.Text = "Mark"
 	else
 		lastObject = obj
 		lastClick = time
@@ -540,10 +574,110 @@ teleportBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if hrp then
+		-- Logika Teleport Biasa (Sudah benar, mempertahankan arah)
 		local originalLookVector = hrp.CFrame.LookVector
 		local targetPosition = selectedObject.CFrame.Position + Vector3.new(0,5,0)
 		hrp.CFrame = CFrame.new(targetPosition, targetPosition + originalLookVector)
 	end
+end)
+
+-- FITUR: MARK
+markBtn.MouseButton1Click:Connect(function()
+	if not selectedObject then return end
+
+	markedCFrame = selectedObject.CFrame
+
+	print("--- MARK SAVED ---")
+	print("Position:", markedCFrame.Position)
+	print("------------------")
+
+	selectedObject:SetAttribute("Marked", true)
+	selectedObject.Color = Color3.fromRGB(0, 255, 255)
+
+	markBtn.Text = "Marked!"
+	task.wait(0.5)
+	markBtn.Text = "Mark"
+end)
+
+deleteBtn.MouseButton1Click:Connect(function()
+	if not selectedObject then return end
+
+	selectedObject:Destroy()
+	selectedObject = nil
+	menu.Visible = false
+end)
+
+-------------------------------------------------
+-- FITUR UTAMA: TP TO MARK (FIXED ROTATION)
+-------------------------------------------------
+
+tpMarkBtn.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	-- LOGIKA UNDO
+	if isUndoMode then
+		if tempMarkCFrame then
+			-- 1. Ambil arah muka player SAAT INI (sebelum undo)
+			local currentLook = hrp.CFrame.LookVector
+			-- 2. Ambil posisi tujuan (temporary)
+			local targetPos = tempMarkCFrame.Position
+
+			-- 3. Teleport (Posisi baru, tapi arah tetap mengikuti currentLook)
+			hrp.CFrame = CFrame.new(targetPos, targetPos + currentLook)
+			print("Returned to temporary position.")
+		end
+
+		-- Reset State
+		isUndoMode = false
+		tempMarkCFrame = nil
+		if undoThread then task.cancel(undoThread) end
+		tpMarkBtn.Text = "TP to Mark"
+		tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+		return
+	end
+
+	-- LOGIKA TELEPORT UTAMA
+	if not markedCFrame then
+		tpMarkBtn.Text = "No Mark!"
+		task.wait(0.5)
+		tpMarkBtn.Text = "TP to Mark"
+		return
+	end
+
+	-- 1. Simpan posisi saat ini sebagai Temporary (untuk undo nanti)
+	tempMarkCFrame = hrp.CFrame
+
+	-- 2. Simpan arah muka player SEBELUM teleport
+	local originalLook = hrp.CFrame.LookVector
+
+	-- 3. Ambil posisi tujuan (Mark)
+	local targetPos = markedCFrame.Position
+
+	-- 4. Teleport: Pindah ke posisi mark, tapi tetap menghadap ke 'originalLook'
+	hrp.CFrame = CFrame.new(targetPos, targetPos + originalLook)
+
+	-- 5. Aktifkan Mode Undo & Countdown
+	isUndoMode = true
+	tpMarkBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+
+	undoThread = task.spawn(function()
+		for i = 10, 0, -1 do
+			if not isUndoMode then break end
+			tpMarkBtn.Text = "Undo ("..tostring(i)..")"
+			task.wait(1)
+		end
+
+		if isUndoMode then
+			isUndoMode = false
+			tempMarkCFrame = nil
+			tpMarkBtn.Text = "TP to Mark"
+			tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+			print("Undo time expired.")
+		end
+	end)
 end)
 
 -------------------------------------------------
