@@ -1,5 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 6
--- Fix: Teleport preserves player rotation (LookVector)
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 7 (Modified)
+-- Fitur: Vision, Jump, Ghost, Teleport/Marking Coordinate, Minimize UI
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -30,15 +30,28 @@ panel.Parent = gui
 Instance.new("UICorner",panel).CornerRadius = UDim.new(0,8)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 20)
-title.Position = UDim2.new(0, 0, 0, 3)
+title.Size = UDim2.new(1, -30, 0, 20) -- Diperkecil agar tidak bertabrakan dengan tombol minimize
+title.Position = UDim2.new(0, 5, 0, 3)
 title.BackgroundTransparency = 1
-title.Text = "Skizoo Cheat"
+title.Text = "SKIZOO"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.SourceSansBold
-title.TextXAlignment = Enum.TextXAlignment.Center
+title.TextXAlignment = Enum.TextXAlignment.Left -- Rata kiri biar rapi
 title.TextSize = 14
 title.Parent = panel
+
+-- Tombol Minimize
+local minBtn = Instance.new("TextButton")
+minBtn.Name = "MinimizeBtn"
+minBtn.Size = UDim2.new(0, 20, 0, 20)
+minBtn.Position = UDim2.new(1, -25, 0, 3) -- Pojok kanan atas
+minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.Font = Enum.Font.SourceSansBold
+minBtn.TextSize = 16
+minBtn.Text = "-"
+minBtn.Parent = panel
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
 
 -------------------------------------------------
 -- BUTTON CREATOR
@@ -63,9 +76,13 @@ local visionBtn = createButton("Vision",10)
 local jumpBtn = createButton("Jump",90)
 local ghostBtn = createButton("Ghost",170)
 
--- Baris 2
-local tpMarkBtn = createButton("Teleport", 10, 60)
-tpMarkBtn.Size = UDim2.new(0, 230, 0, 28)
+-- Baris 2 (Layout Baru: Marking Kiri, Teleport Kanan)
+local markingBtn = createButton("Marking", 10, 60) -- Pindah ke kiri (X: 10)
+markingBtn.Size = UDim2.new(0, 110, 0, 28)
+markingBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+
+local tpMarkBtn = createButton("Teleport", 130, 60) -- Pindah ke kanan (X: 130)
+tpMarkBtn.Size = UDim2.new(0, 110, 0, 28)
 tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
 
 -------------------------------------------------
@@ -122,6 +139,36 @@ local markedCFrame = nil
 local tempMarkCFrame = nil 
 local isUndoMode = false 
 local undoThread = nil 
+
+-------------------------------------------------
+-- FITUR MINIMIZE
+-------------------------------------------------
+
+local isMinimized = false
+local originalSize = panel.Size
+
+minBtn.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		panel.Size = UDim2.new(0, 250, 0, 30) -- Ukuran minimized (hanya header)
+		minBtn.Text = "+"
+		-- Sembunyikan semua tombol
+		visionBtn.Visible = false
+		jumpBtn.Visible = false
+		ghostBtn.Visible = false
+		markingBtn.Visible = false
+		tpMarkBtn.Visible = false
+	else
+		panel.Size = originalSize
+		minBtn.Text = "-"
+		-- Tampilkan semua tombol
+		visionBtn.Visible = true
+		jumpBtn.Visible = true
+		ghostBtn.Visible = true
+		markingBtn.Visible = true
+		tpMarkBtn.Visible = true
+	end
+end)
 
 -------------------------------------------------
 -- BUTTON TOGGLE
@@ -574,14 +621,13 @@ teleportBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if hrp then
-		-- Logika Teleport Biasa (Sudah benar, mempertahankan arah)
 		local originalLookVector = hrp.CFrame.LookVector
 		local targetPosition = selectedObject.CFrame.Position + Vector3.new(0,5,0)
 		hrp.CFrame = CFrame.new(targetPosition, targetPosition + originalLookVector)
 	end
 end)
 
--- FITUR: MARK
+-- FITUR: MARK (Melalui Menu)
 markBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
 
@@ -608,6 +654,34 @@ deleteBtn.MouseButton1Click:Connect(function()
 end)
 
 -------------------------------------------------
+-- FITUR BARU: MARKING (Tombol Utama)
+-------------------------------------------------
+
+markingBtn.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	-- Simpan CFrame pemain saat ini
+	markedCFrame = hrp.CFrame
+
+	-- Feedback Visual
+	markingBtn.Text = "Marked!"
+	markingBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+	print("--- MARKING SAVED ---")
+	print("Current Position Marked:", markedCFrame.Position)
+	print("---------------------")
+
+	task.wait(0.3)
+
+	-- Reset Tampilan
+	markingBtn.Text = "Marking"
+	markingBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+end)
+
+-------------------------------------------------
 -- FITUR UTAMA: TP TO MARK (FIXED ROTATION)
 -------------------------------------------------
 
@@ -620,21 +694,16 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 	-- LOGIKA UNDO
 	if isUndoMode then
 		if tempMarkCFrame then
-			-- 1. Ambil arah muka player SAAT INI (sebelum undo)
 			local currentLook = hrp.CFrame.LookVector
-			-- 2. Ambil posisi tujuan (temporary)
 			local targetPos = tempMarkCFrame.Position
-
-			-- 3. Teleport (Posisi baru, tapi arah tetap mengikuti currentLook)
 			hrp.CFrame = CFrame.new(targetPos, targetPos + currentLook)
 			print("Returned to temporary position.")
 		end
 
-		-- Reset State
 		isUndoMode = false
 		tempMarkCFrame = nil
 		if undoThread then task.cancel(undoThread) end
-		tpMarkBtn.Text = "TP to Mark"
+		tpMarkBtn.Text = "Teleport"
 		tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
 		return
 	end
@@ -643,7 +712,7 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 	if not markedCFrame then
 		tpMarkBtn.Text = "No Mark!"
 		task.wait(0.5)
-		tpMarkBtn.Text = "TP to Mark"
+		tpMarkBtn.Text = "Teleport"
 		return
 	end
 
@@ -656,7 +725,7 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 	-- 3. Ambil posisi tujuan (Mark)
 	local targetPos = markedCFrame.Position
 
-	-- 4. Teleport: Pindah ke posisi mark, tapi tetap menghadap ke 'originalLook'
+	-- 4. Teleport
 	hrp.CFrame = CFrame.new(targetPos, targetPos + originalLook)
 
 	-- 5. Aktifkan Mode Undo & Countdown
@@ -673,7 +742,7 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 		if isUndoMode then
 			isUndoMode = false
 			tempMarkCFrame = nil
-			tpMarkBtn.Text = "TP to Mark"
+			tpMarkBtn.Text = "Teleport"
 			tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
 			print("Undo time expired.")
 		end
