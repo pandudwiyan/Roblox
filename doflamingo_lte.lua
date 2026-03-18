@@ -106,7 +106,7 @@ local plTitle = Instance.new("TextLabel")
 plTitle.Size = UDim2.new(1, -30, 0, 25)
 plTitle.Position = UDim2.new(0, 10, 0, 5)
 plTitle.BackgroundTransparency = 1
-plTitle.Text = "Player List (Sorted by Distance)"
+plTitle.Text = "Player"
 plTitle.TextColor3 = Color3.new(1, 1, 1)
 plTitle.Font = Enum.Font.GothamBold
 plTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -286,30 +286,38 @@ end
 -------------------------------------------------
 
 local function makeDraggable(frame)
-	local dragging
-	local dragStart
-	local startPos
+    local dragging
+    local dragStart
+    local startPos
 
-	frame.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = frame.Position
-		end
-	end)
+    frame.InputBegan:Connect(function(input)
+        -- Mendukung Klik Kiri (PC) dan Sentuhan (Mobile)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            
+            -- Mengubah ZIndex agar panel yang diseret berada di paling atas
+            frame.ZIndex = 10 
+        end
+    end)
 
-	frame.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            frame.ZIndex = 1 -- Kembalikan ZIndex
+        end
+    end)
 
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging then
+            -- FIX: Tambahkan pengecekan "Touch" agar bisa digeser di HP
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                local delta = input.Position - dragStart
+                frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
 end
 
 makeDraggable(panel)
