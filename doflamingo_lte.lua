@@ -1,5 +1,6 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 15 (UI Panel Update)
--- Update: Panel Search sekarang bisa di-minimize. Panel Player List sekarang ada tombol Close.
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 17 (Optimized Search)
+-- Update: Input text tidak terhapus. Search dipicu Enter (bukan realtime saat ketik). 
+-- Hasil search realtime distance & sorting setelah panel muncul.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -146,12 +147,13 @@ cmdBox.Size = UDim2.new(1, -10, 0, 25)
 cmdBox.Position = UDim2.new(0, 5, 0, 30)
 cmdBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 cmdBox.TextColor3 = Color3.new(1, 1, 1)
-cmdBox.PlaceholderText = "command here"
+cmdBox.PlaceholderText = "command here (e.g w:cp)"
 cmdBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 cmdBox.Font = Enum.Font.Gotham
 cmdBox.TextSize = 14
 cmdBox.Text = ""
 cmdBox.Visible = false
+cmdBox.ClearTextOnFocus = false -- UPDATE: Tidak menghapus teks saat diklik
 cmdBox.Parent = panel
 Instance.new("UICorner", cmdBox).CornerRadius = UDim.new(0, 4)
 
@@ -169,7 +171,7 @@ enterBtn.Parent = panel
 Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
 
 -------------------------------------------------
--- WORKSPACE SEARCH RESULT UI (Updated)
+-- WORKSPACE SEARCH RESULT UI
 -------------------------------------------------
 
 local searchResultPanel = Instance.new("Frame")
@@ -184,7 +186,7 @@ searchResultPanel.Parent = gui
 Instance.new("UICorner", searchResultPanel).CornerRadius = UDim.new(0, 8)
 
 local srTitle = Instance.new("TextLabel")
-srTitle.Size = UDim2.new(1, -60, 0, 25) -- Disesuaikan agar muat 2 tombol
+srTitle.Size = UDim2.new(1, -60, 0, 25)
 srTitle.Position = UDim2.new(0, 10, 0, 5)
 srTitle.BackgroundTransparency = 1
 srTitle.Text = "Search Result"
@@ -194,10 +196,10 @@ srTitle.TextXAlignment = Enum.TextXAlignment.Left
 srTitle.TextSize = 14
 srTitle.Parent = searchResultPanel
 
--- Tombol Minimize Search (Baru)
+-- Tombol Minimize Search
 local srMinBtn = Instance.new("TextButton")
 srMinBtn.Size = UDim2.new(0, 20, 0, 20)
-srMinBtn.Position = UDim2.new(1, -50, 0, 5) -- Kiri tombol Close
+srMinBtn.Position = UDim2.new(1, -50, 0, 5)
 srMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 srMinBtn.TextColor3 = Color3.new(1, 1, 1)
 srMinBtn.Font = Enum.Font.GothamBold
@@ -209,7 +211,7 @@ Instance.new("UICorner", srMinBtn).CornerRadius = UDim.new(0, 4)
 -- Tombol Close Search
 local srCloseBtn = Instance.new("TextButton")
 srCloseBtn.Size = UDim2.new(0, 20, 0, 20)
-srCloseBtn.Position = UDim2.new(1, -25, 0, 5) -- Paling kanan
+srCloseBtn.Position = UDim2.new(1, -25, 0, 5)
 srCloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 srCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 srCloseBtn.Font = Enum.Font.GothamBold
@@ -279,7 +281,7 @@ end)
 makeDraggable(searchResultPanel)
 
 -------------------------------------------------
--- PLAYER LIST GUI (Updated)
+-- PLAYER LIST GUI
 -------------------------------------------------
 
 local playerListPanel = Instance.new("Frame")
@@ -294,7 +296,7 @@ playerListPanel.Parent = gui
 Instance.new("UICorner", playerListPanel).CornerRadius = UDim.new(0, 8)
 
 local plTitle = Instance.new("TextLabel")
-plTitle.Size = UDim2.new(1, -60, 0, 25) -- Disesuaikan
+plTitle.Size = UDim2.new(1, -60, 0, 25)
 plTitle.Position = UDim2.new(0, 10, 0, 5)
 plTitle.BackgroundTransparency = 1
 plTitle.Text = "Player (0 Player)"
@@ -307,7 +309,7 @@ plTitle.Parent = playerListPanel
 -- Tombol Minimize Player List
 local plMinBtn = Instance.new("TextButton")
 plMinBtn.Size = UDim2.new(0, 20, 0, 20)
-plMinBtn.Position = UDim2.new(1, -50, 0, 5) -- Kiri tombol Close
+plMinBtn.Position = UDim2.new(1, -50, 0, 5)
 plMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 plMinBtn.TextColor3 = Color3.new(1, 1, 1)
 plMinBtn.Font = Enum.Font.GothamBold
@@ -316,10 +318,10 @@ plMinBtn.Text = "-"
 plMinBtn.Parent = playerListPanel
 Instance.new("UICorner", plMinBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Close Player List (Baru)
+-- Tombol Close Player List
 local plCloseBtn = Instance.new("TextButton")
 plCloseBtn.Size = UDim2.new(0, 20, 0, 20)
-plCloseBtn.Position = UDim2.new(1, -25, 0, 5) -- Paling kanan
+plCloseBtn.Position = UDim2.new(1, -25, 0, 5)
 plCloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 plCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 plCloseBtn.Font = Enum.Font.GothamBold
@@ -339,6 +341,7 @@ searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 searchBox.Font = Enum.Font.Gotham
 searchBox.TextSize = 14
 searchBox.Text = ""
+searchBox.ClearTextOnFocus = false -- UPDATE: Tidak menghapus teks saat diklik
 searchBox.Parent = playerListPanel
 Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 4)
 
@@ -442,6 +445,11 @@ local isEvilMode = false
 local isMinimized = false
 local originalSize = panel.Size
 
+-- Variable untuk Search
+local currentSearchResults = {} -- Menyimpan {Object, RowFrame, DistLabel}
+local currentSearchTerm = ""
+local searchLoopConnection = nil
+
 -------------------------------------------------
 -- EVIL MODE TOGGLE
 -------------------------------------------------
@@ -486,142 +494,187 @@ minBtn.MouseButton1Click:Connect(function()
 end)
 
 -------------------------------------------------
--- COMMAND LOGIC (Sort by Distance)
+-- COMMAND LOGIC (On Enter -> Realtime Loop)
 -------------------------------------------------
 
-local function createSearchRow(index, obj, distance)
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 25)
-	row.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	row.BackgroundTransparency = 0.5
-	row.LayoutOrder = index
-	row.Parent = srScroll
-	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
-
-	local xPos = 5
-
-	-- No
-	local noL = Instance.new("TextLabel")
-	noL.Size = UDim2.new(0, srColWidths[1], 1, 0)
-	noL.Position = UDim2.new(0, xPos, 0, 0)
-	noL.BackgroundTransparency = 1
-	noL.Text = tostring(index)
-	noL.TextColor3 = Color3.new(1, 1, 1)
-	noL.Font = Enum.Font.Gotham
-	noL.TextSize = 12
-	noL.Parent = row
-	xPos = xPos + srColWidths[1]
-
-	-- Name
-	local nameL = Instance.new("TextLabel")
-	nameL.Size = UDim2.new(0, srColWidths[2], 1, 0)
-	nameL.Position = UDim2.new(0, xPos, 0, 0)
-	nameL.BackgroundTransparency = 1
-	nameL.Text = obj.Name
-	nameL.TextColor3 = Color3.new(1, 1, 1)
-	nameL.Font = Enum.Font.Gotham
-	nameL.TextSize = 12
-	nameL.TextXAlignment = Enum.TextXAlignment.Left
-	nameL.Parent = row
-	xPos = xPos + srColWidths[2]
-
-	-- Distance
-	local distL = Instance.new("TextLabel")
-	distL.Size = UDim2.new(0, srColWidths[3], 1, 0)
-	distL.Position = UDim2.new(0, xPos, 0, 0)
-	distL.BackgroundTransparency = 1
-	distL.Text = string.format("%.0f", distance)
-	distL.TextColor3 = Color3.new(1, 1, 1)
-	distL.Font = Enum.Font.Gotham
-	distL.TextSize = 12
-	distL.Parent = row
-	xPos = xPos + srColWidths[3]
-
-	-- Teleport Button
-	local tpB = Instance.new("TextButton")
-	tpB.Size = UDim2.new(0, srColWidths[4] - 10, 1, -4)
-	tpB.Position = UDim2.new(0, xPos + 5, 0, 2)
-	tpB.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-	tpB.Text = "Teleport"
-	tpB.TextColor3 = Color3.new(1, 1, 1)
-	tpB.Font = Enum.Font.GothamBold
-	tpB.TextSize = 11
-	tpB.Parent = row
-	Instance.new("UICorner", tpB).CornerRadius = UDim.new(0, 4)
-
-	tpB.MouseButton1Click:Connect(function()
-		local char = player.Character
-		if char and obj then
-			local hrp = char:FindFirstChild("HumanoidRootPart")
-			local pos = nil
-
-			if obj:IsA("BasePart") then
-				pos = obj.Position
-			elseif obj:IsA("Model") then
-				if obj.PrimaryPart then
-					pos = obj.PrimaryPart.Position
-				else
-					local hrpInModel = obj:FindFirstChild("HumanoidRootPart")
-					if hrpInModel then pos = hrpInModel.Position end
-				end
-			end
-
-			if hrp and pos then
-				hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
-			end
-		end
-	end)
+local function getObjectPosition(obj)
+	if obj:IsA("BasePart") then
+		return obj.Position
+	elseif obj:IsA("Model") then
+		if obj.PrimaryPart then return obj.PrimaryPart.Position end
+		local hrp = obj:FindFirstChild("HumanoidRootPart")
+		if hrp then return hrp.Position end
+		local root = obj:FindFirstChild("RootPart")
+		if root then return root.Position end
+	end
+	return nil
 end
 
-enterBtn.MouseButton1Click:Connect(function()
-	local text = cmdBox.Text
-	if #text < 1 then return end
+local function clearSearchRows()
+	for _, child in pairs(srScroll:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+	currentSearchResults = {}
+end
 
-	if string.sub(text, 1, 2) == "w:" then
-		local searchName = string.sub(text, 3)
-		if #searchName < 1 then return end
+local function performSearch(searchName)
+	if #searchName < 1 then return end
 
-		for _, child in pairs(srScroll:GetChildren()) do
-			if child:IsA("Frame") then child:Destroy() end
-		end
+	-- Hapus hasil lama
+	clearSearchRows()
+	currentSearchTerm = searchName
 
-		local foundObjects = {}
-		local myChar = player.Character
-		local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+	-- Lakukan Scan Workspace (Hanya sekali saat Enter)
+	local foundObjects = {}
+	local myChar = player.Character
+	local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
-		for _, obj in pairs(Workspace:GetDescendants()) do
-			if string.find(string.lower(obj.Name), string.lower(searchName)) then
-				if obj:IsA("BasePart") or obj:IsA("Model") then
-					local dist = 0
-					if myHrp then
-						local pos = nil
-						if obj:IsA("BasePart") then pos = obj.Position
-						elseif obj:IsA("Model") then 
-							if obj.PrimaryPart then pos = obj.PrimaryPart.Position
-							elseif obj:FindFirstChild("HumanoidRootPart") then pos = obj.HumanoidRootPart.Position end
-						end
-						if pos then dist = (pos - myHrp.Position).Magnitude end
-					end
-					table.insert(foundObjects, {Object = obj, Distance = dist})
+	for _, obj in pairs(Workspace:GetDescendants()) do
+		if string.find(string.lower(obj.Name), string.lower(searchName)) then
+			if obj:IsA("BasePart") or obj:IsA("Model") then
+				local dist = 0
+				if myHrp then
+					local pos = getObjectPosition(obj)
+					if pos then dist = (pos - myHrp.Position).Magnitude end
 				end
+				table.insert(foundObjects, {Object = obj, Distance = dist})
 			end
 		end
+	end
 
-		table.sort(foundObjects, function(a, b) return a.Distance < b.Distance end)
+	table.sort(foundObjects, function(a, b) return a.Distance < b.Distance end)
 
-		searchResultPanel.Visible = true
-		srTitle.Text = "Search: " .. searchName .. " (" .. #foundObjects .. " found)"
+	searchResultPanel.Visible = true
+	srTitle.Text = "Search: " .. searchName .. " (" .. #foundObjects .. " found)"
 
-		for i, data in pairs(foundObjects) do
-			createSearchRow(i, data.Object, data.Distance)
-		end
+	-- Buat UI untuk hasil
+	for i, data in pairs(foundObjects) do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, 0, 0, 25)
+		row.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+		row.BackgroundTransparency = 0.5
+		row.LayoutOrder = math.floor(data.Distance)
+		row.Parent = srScroll
+		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
 
-		srLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			srScroll.CanvasSize = UDim2.new(0, 0, 0, srLayout.AbsoluteContentSize.Y)
+		local xPos = 5
+
+		-- No
+		local noL = Instance.new("TextLabel")
+		noL.Size = UDim2.new(0, srColWidths[1], 1, 0)
+		noL.Position = UDim2.new(0, xPos, 0, 0)
+		noL.BackgroundTransparency = 1
+		noL.Text = tostring(i)
+		noL.TextColor3 = Color3.new(1, 1, 1)
+		noL.Font = Enum.Font.Gotham
+		noL.TextSize = 12
+		noL.Parent = row
+		xPos = xPos + srColWidths[1]
+
+		-- Name
+		local nameL = Instance.new("TextLabel")
+		nameL.Size = UDim2.new(0, srColWidths[2], 1, 0)
+		nameL.Position = UDim2.new(0, xPos, 0, 0)
+		nameL.BackgroundTransparency = 1
+		nameL.Text = data.Object.Name
+		nameL.TextColor3 = Color3.new(1, 1, 1)
+		nameL.Font = Enum.Font.Gotham
+		nameL.TextSize = 12
+		nameL.TextXAlignment = Enum.TextXAlignment.Left
+		nameL.Parent = row
+		xPos = xPos + srColWidths[2]
+
+		-- Distance
+		local distL = Instance.new("TextLabel")
+		distL.Size = UDim2.new(0, srColWidths[3], 1, 0)
+		distL.Position = UDim2.new(0, xPos, 0, 0)
+		distL.BackgroundTransparency = 1
+		distL.Text = string.format("%.0f", data.Distance)
+		distL.TextColor3 = Color3.new(1, 1, 1)
+		distL.Font = Enum.Font.Gotham
+		distL.TextSize = 12
+		distL.Parent = row
+		xPos = xPos + srColWidths[3]
+
+		-- Teleport Button
+		local tpB = Instance.new("TextButton")
+		tpB.Size = UDim2.new(0, srColWidths[4] - 10, 1, -4)
+		tpB.Position = UDim2.new(0, xPos + 5, 0, 2)
+		tpB.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+		tpB.Text = "Teleport"
+		tpB.TextColor3 = Color3.new(1, 1, 1)
+		tpB.Font = Enum.Font.GothamBold
+		tpB.TextSize = 11
+		tpB.Parent = row
+		Instance.new("UICorner", tpB).CornerRadius = UDim.new(0, 4)
+
+		tpB.MouseButton1Click:Connect(function()
+			local char = player.Character
+			if char and data.Object then
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				local pos = getObjectPosition(data.Object)
+				if hrp and pos then
+					hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+					-- Auto Re-scan setelah teleport
+					task.wait(0.5)
+					performSearch(currentSearchTerm)
+				end
+			end
 		end)
-		srScroll.CanvasSize = UDim2.new(0, 0, 0, srLayout.AbsoluteContentSize.Y)
 
-		cmdBox.Text = ""
+		table.insert(currentSearchResults, {Object = data.Object, Row = row, DistLabel = distL})
+	end
+
+	srLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		srScroll.CanvasSize = UDim2.new(0, 0, 0, srLayout.AbsoluteContentSize.Y)
+	end)
+	srScroll.CanvasSize = UDim2.new(0, 0, 0, srLayout.AbsoluteContentSize.Y)
+
+	-- Mulai Loop Realtime untuk Update Jarak & Sort (Hanya jika belum berjalan)
+	if not searchLoopConnection then
+		searchLoopConnection = RunService.RenderStepped:Connect(function()
+			if not searchResultPanel.Visible then return end
+			local myChar = player.Character
+			local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+			for i, data in pairs(currentSearchResults) do
+				if data.Object and data.Object.Parent and data.DistLabel and data.Row then
+					local pos = getObjectPosition(data.Object)
+					if pos and myHrp then
+						local dist = (pos - myHrp.Position).Magnitude
+						data.DistLabel.Text = string.format("%.0f", dist)
+						data.Row.LayoutOrder = math.floor(dist) -- Sort otomatis
+					else
+						data.DistLabel.Text = "N/A"
+						data.Row.LayoutOrder = 99999
+					end
+				else
+					if data.Row then data.Row.Visible = false end
+				end
+			end
+		end)
+	end
+end
+
+-- Trigger via Tombol Enter UI
+enterBtn.MouseButton1Click:Connect(function()
+	local text = cmdBox.Text
+	if string.sub(text, 1, 2) == "w:" then
+		local searchName = string.sub(text, 3)
+		performSearch(searchName)
+	else
+		-- Logika lain jika bukan w: (opsional)
+	end
+end)
+
+-- Trigger via Keyboard Enter
+cmdBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local text = cmdBox.Text
+		if string.sub(text, 1, 2) == "w:" then
+			local searchName = string.sub(text, 3)
+			performSearch(searchName)
+		end
 	end
 end)
 
@@ -1066,7 +1119,6 @@ playerListBtn.MouseButton1Click:Connect(function()
 	playerListPanel.Visible = not playerListPanel.Visible
 end)
 
--- Logic Minimize Player List
 plMinBtn.MouseButton1Click:Connect(function()
 	isPlayerListMinimized = not isPlayerListMinimized
 	if isPlayerListMinimized then
@@ -1082,7 +1134,6 @@ plMinBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Logic Close Player List
 plCloseBtn.MouseButton1Click:Connect(function()
 	playerListPanel.Visible = false
 end)
