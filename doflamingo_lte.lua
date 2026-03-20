@@ -1,5 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 14 (Search Sort by Distance)
--- Update: Hasil pencarian 'w:name' sekarang diurutkan berdasarkan jarak terdekat
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 15 (UI Panel Update)
+-- Update: Panel Search sekarang bisa di-minimize. Panel Player List sekarang ada tombol Close.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -52,7 +52,7 @@ minBtn.Text = "-"
 minBtn.Parent = panel
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Evil (Toggle)
+-- Tombol Evil
 local evilBtn = Instance.new("TextButton")
 evilBtn.Name = "EvilBtn"
 evilBtn.Size = UDim2.new(0, 35, 0, 20)
@@ -127,12 +127,9 @@ end
 -- FEATURE BUTTONS
 -------------------------------------------------
 
--- Baris 1
 local visionBtn = createButton("Vision", START_X, 30, Color3.fromRGB(70, 70, 70))
 local jumpBtn = createButton("Jump", START_X + (BTN_WIDTH + BTN_GAP), 30, Color3.fromRGB(70, 70, 70))
 local ghostBtn = createButton("Ghost", START_X + (BTN_WIDTH + BTN_GAP) * 2, 30, Color3.fromRGB(70, 70, 70))
-
--- Baris 2
 local playerListBtn = createButton("Player", START_X, 62, Color3.fromRGB(150, 50, 50))
 local markingBtn = createButton("Marking", START_X + (BTN_WIDTH + BTN_GAP), 62, Color3.fromRGB(0, 100, 150))
 local tpMarkBtn = createButton("Teleport", START_X + (BTN_WIDTH + BTN_GAP) * 2, 62, Color3.fromRGB(100, 0, 150))
@@ -172,7 +169,7 @@ enterBtn.Parent = panel
 Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
 
 -------------------------------------------------
--- WORKSPACE SEARCH RESULT UI
+-- WORKSPACE SEARCH RESULT UI (Updated)
 -------------------------------------------------
 
 local searchResultPanel = Instance.new("Frame")
@@ -187,7 +184,7 @@ searchResultPanel.Parent = gui
 Instance.new("UICorner", searchResultPanel).CornerRadius = UDim.new(0, 8)
 
 local srTitle = Instance.new("TextLabel")
-srTitle.Size = UDim2.new(1, -30, 0, 25)
+srTitle.Size = UDim2.new(1, -60, 0, 25) -- Disesuaikan agar muat 2 tombol
 srTitle.Position = UDim2.new(0, 10, 0, 5)
 srTitle.BackgroundTransparency = 1
 srTitle.Text = "Search Result"
@@ -197,9 +194,22 @@ srTitle.TextXAlignment = Enum.TextXAlignment.Left
 srTitle.TextSize = 14
 srTitle.Parent = searchResultPanel
 
+-- Tombol Minimize Search (Baru)
+local srMinBtn = Instance.new("TextButton")
+srMinBtn.Size = UDim2.new(0, 20, 0, 20)
+srMinBtn.Position = UDim2.new(1, -50, 0, 5) -- Kiri tombol Close
+srMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+srMinBtn.TextColor3 = Color3.new(1, 1, 1)
+srMinBtn.Font = Enum.Font.GothamBold
+srMinBtn.TextSize = 14
+srMinBtn.Text = "-"
+srMinBtn.Parent = searchResultPanel
+Instance.new("UICorner", srMinBtn).CornerRadius = UDim.new(0, 4)
+
+-- Tombol Close Search
 local srCloseBtn = Instance.new("TextButton")
 srCloseBtn.Size = UDim2.new(0, 20, 0, 20)
-srCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+srCloseBtn.Position = UDim2.new(1, -25, 0, 5) -- Paling kanan
 srCloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 srCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 srCloseBtn.Font = Enum.Font.GothamBold
@@ -247,6 +257,21 @@ local srLayout = Instance.new("UIListLayout")
 srLayout.SortOrder = Enum.SortOrder.LayoutOrder
 srLayout.Parent = srScroll
 
+-- Logic Minimize Search
+local isSearchMinimized = false
+srMinBtn.MouseButton1Click:Connect(function()
+	isSearchMinimized = not isSearchMinimized
+	if isSearchMinimized then
+		searchResultPanel.Size = UDim2.new(0, 400, 0, 30)
+		srMinBtn.Text = "+"
+		srContainer.Visible = false
+	else
+		searchResultPanel.Size = UDim2.new(0, 400, 0, 300)
+		srMinBtn.Text = "-"
+		srContainer.Visible = true
+	end
+end)
+
 srCloseBtn.MouseButton1Click:Connect(function()
 	searchResultPanel.Visible = false
 end)
@@ -254,7 +279,7 @@ end)
 makeDraggable(searchResultPanel)
 
 -------------------------------------------------
--- PLAYER LIST GUI
+-- PLAYER LIST GUI (Updated)
 -------------------------------------------------
 
 local playerListPanel = Instance.new("Frame")
@@ -269,7 +294,7 @@ playerListPanel.Parent = gui
 Instance.new("UICorner", playerListPanel).CornerRadius = UDim.new(0, 8)
 
 local plTitle = Instance.new("TextLabel")
-plTitle.Size = UDim2.new(1, -30, 0, 25)
+plTitle.Size = UDim2.new(1, -60, 0, 25) -- Disesuaikan
 plTitle.Position = UDim2.new(0, 10, 0, 5)
 plTitle.BackgroundTransparency = 1
 plTitle.Text = "Player (0 Player)"
@@ -279,9 +304,10 @@ plTitle.TextXAlignment = Enum.TextXAlignment.Left
 plTitle.TextSize = 14
 plTitle.Parent = playerListPanel
 
+-- Tombol Minimize Player List
 local plMinBtn = Instance.new("TextButton")
 plMinBtn.Size = UDim2.new(0, 20, 0, 20)
-plMinBtn.Position = UDim2.new(1, -25, 0, 5)
+plMinBtn.Position = UDim2.new(1, -50, 0, 5) -- Kiri tombol Close
 plMinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 plMinBtn.TextColor3 = Color3.new(1, 1, 1)
 plMinBtn.Font = Enum.Font.GothamBold
@@ -289,6 +315,18 @@ plMinBtn.TextSize = 14
 plMinBtn.Text = "-"
 plMinBtn.Parent = playerListPanel
 Instance.new("UICorner", plMinBtn).CornerRadius = UDim.new(0, 4)
+
+-- Tombol Close Player List (Baru)
+local plCloseBtn = Instance.new("TextButton")
+plCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+plCloseBtn.Position = UDim2.new(1, -25, 0, 5) -- Paling kanan
+plCloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+plCloseBtn.TextColor3 = Color3.new(1, 1, 1)
+plCloseBtn.Font = Enum.Font.GothamBold
+plCloseBtn.TextSize = 14
+plCloseBtn.Text = "X"
+plCloseBtn.Parent = playerListPanel
+Instance.new("UICorner", plCloseBtn).CornerRadius = UDim.new(0, 4)
 
 local searchBox = Instance.new("TextBox")
 searchBox.Name = "SearchBox"
@@ -456,7 +494,7 @@ local function createSearchRow(index, obj, distance)
 	row.Size = UDim2.new(1, 0, 0, 25)
 	row.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 	row.BackgroundTransparency = 0.5
-	row.LayoutOrder = index -- Penting untuk sorting UI
+	row.LayoutOrder = index
 	row.Parent = srScroll
 	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
 
@@ -543,21 +581,18 @@ enterBtn.MouseButton1Click:Connect(function()
 		local searchName = string.sub(text, 3)
 		if #searchName < 1 then return end
 
-		-- Bersihkan hasil lama
 		for _, child in pairs(srScroll:GetChildren()) do
 			if child:IsA("Frame") then child:Destroy() end
 		end
 
-		local foundObjects = {} -- Table sementara untuk menyimpan {Obj, Dist}
+		local foundObjects = {}
 		local myChar = player.Character
 		local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
-		-- Pencarian
 		for _, obj in pairs(Workspace:GetDescendants()) do
 			if string.find(string.lower(obj.Name), string.lower(searchName)) then
 				if obj:IsA("BasePart") or obj:IsA("Model") then
 					local dist = 0
-					-- Hitung jarak
 					if myHrp then
 						local pos = nil
 						if obj:IsA("BasePart") then pos = obj.Position
@@ -572,13 +607,11 @@ enterBtn.MouseButton1Click:Connect(function()
 			end
 		end
 
-		-- Sorting (Mengurutkan dari jarak terdekat)
 		table.sort(foundObjects, function(a, b) return a.Distance < b.Distance end)
 
 		searchResultPanel.Visible = true
 		srTitle.Text = "Search: " .. searchName .. " (" .. #foundObjects .. " found)"
 
-		-- Buat UI berdasarkan urutan sorted
 		for i, data in pairs(foundObjects) do
 			createSearchRow(i, data.Object, data.Distance)
 		end
@@ -1033,6 +1066,7 @@ playerListBtn.MouseButton1Click:Connect(function()
 	playerListPanel.Visible = not playerListPanel.Visible
 end)
 
+-- Logic Minimize Player List
 plMinBtn.MouseButton1Click:Connect(function()
 	isPlayerListMinimized = not isPlayerListMinimized
 	if isPlayerListMinimized then
@@ -1046,6 +1080,11 @@ plMinBtn.MouseButton1Click:Connect(function()
 		listContainer.Visible = true
 		searchBox.Visible = true
 	end
+end)
+
+-- Logic Close Player List
+plCloseBtn.MouseButton1Click:Connect(function()
+	playerListPanel.Visible = false
 end)
 
 local function stopSpectate()
