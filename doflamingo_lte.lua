@@ -1,11 +1,11 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 17 (Optimized Search)
--- Update: Input text tidak terhapus. Search dipicu Enter (bukan realtime saat ketik). 
--- Hasil search realtime distance & sorting setelah panel muncul.
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 19 (Fixed)
+-- Update: Fixed Syntax Error & Neat UI Layout
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -30,7 +30,7 @@ panel.Parent = gui
 Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 8)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -70, 0, 20)
+title.Size = UDim2.new(1, -105, 0, 20)
 title.Position = UDim2.new(0, 10, 0, 5)
 title.BackgroundTransparency = 1
 title.Text = "SKIZOO"
@@ -40,7 +40,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextSize = 14
 title.Parent = panel
 
--- Tombol Minimize
+-- Tombol Minimize (Pojok Kanan)
 local minBtn = Instance.new("TextButton")
 minBtn.Name = "MinimizeBtn"
 minBtn.Size = UDim2.new(0, 20, 0, 20)
@@ -53,11 +53,24 @@ minBtn.Text = "-"
 minBtn.Parent = panel
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Evil
+-- Tombol Pin (Kiri Minimize)
+local pinBtn = Instance.new("TextButton")
+pinBtn.Name = "PinBtn"
+pinBtn.Size = UDim2.new(0, 25, 0, 20)
+pinBtn.Position = UDim2.new(1, -55, 0, 5) -- Gap 5px dari minimize
+pinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+pinBtn.TextColor3 = Color3.new(1, 1, 1)
+pinBtn.Font = Enum.Font.GothamBold
+pinBtn.TextSize = 12
+pinBtn.Text = "pin"
+pinBtn.Parent = panel
+Instance.new("UICorner", pinBtn).CornerRadius = UDim.new(0, 4)
+
+-- Tombol Evil (Kiri Pin)
 local evilBtn = Instance.new("TextButton")
 evilBtn.Name = "EvilBtn"
 evilBtn.Size = UDim2.new(0, 35, 0, 20)
-evilBtn.Position = UDim2.new(1, -65, 0, 5)
+evilBtn.Position = UDim2.new(1, -95, 0, 5) -- Gap 5px dari pin
 evilBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 evilBtn.TextColor3 = Color3.new(1, 1, 1)
 evilBtn.Font = Enum.Font.GothamBold
@@ -67,8 +80,90 @@ evilBtn.Parent = panel
 Instance.new("UICorner", evilBtn).CornerRadius = UDim.new(0, 4)
 
 -------------------------------------------------
+-- VARIABLES
+-------------------------------------------------
+
+local isPinned = false
+local autoMarkingActive = false
+
+local selectedObject
+local selectedOriginalColor
+local broughtObjects = {}
+local lastClick = 0
+local lastObject
+local originalTransparency = {}
+local originalColors = {}
+local objectLabels = {}
+
+local ghostSphere = nil
+local ghostConnections = {}
+local mobileControls = nil
+
+local markedCFrame = nil
+local tempMarkCFrame = nil
+local isUndoMode = false
+local undoThread = nil
+
+local spectatingPlayer = nil
+local spectatingConnection = nil
+local playerRows = {}
+
+local isEvilMode = false
+local isMinimized = false
+local originalSize = panel.Size
+
+local currentSearchResults = {} 
+local currentSearchTerm = ""
+local searchLoopConnection = nil
+
+-------------------------------------------------
 -- FUNCTIONS
 -------------------------------------------------
+
+local function showRainbowNotification(text)
+	local character = player.Character
+	if not character then return end
+
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	local head = character:FindFirstChild("Head")
+	if not hrp then return end
+
+	local oldGui = character:FindFirstChild("RainbowNotify")
+	if oldGui then oldGui:Destroy() end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "RainbowNotify"
+	billboard.Adornee = head or hrp
+	billboard.Size = UDim2.new(0, 200, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = character
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = text
+	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextStrokeTransparency = 0.8
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextSize = 20
+	textLabel.Parent = billboard
+
+	local rainbowConn
+	rainbowConn = RunService.RenderStepped:Connect(function()
+		if not billboard or not billboard.Parent then 
+			rainbowConn:Disconnect()
+			return 
+		end
+		local hue = tick() % 5 / 5
+		textLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+	end)
+
+	task.delay(3, function()
+		if rainbowConn then rainbowConn:Disconnect() end
+		if billboard then billboard:Destroy() end
+	end)
+end
 
 local function makeDraggable(frame)
 	local dragging
@@ -76,6 +171,8 @@ local function makeDraggable(frame)
 	local startPos
 
 	frame.InputBegan:Connect(function(input)
+		if isPinned then return end 
+
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
@@ -153,7 +250,7 @@ cmdBox.Font = Enum.Font.Gotham
 cmdBox.TextSize = 14
 cmdBox.Text = ""
 cmdBox.Visible = false
-cmdBox.ClearTextOnFocus = false -- UPDATE: Tidak menghapus teks saat diklik
+cmdBox.ClearTextOnFocus = false
 cmdBox.Parent = panel
 Instance.new("UICorner", cmdBox).CornerRadius = UDim.new(0, 4)
 
@@ -196,7 +293,6 @@ srTitle.TextXAlignment = Enum.TextXAlignment.Left
 srTitle.TextSize = 14
 srTitle.Parent = searchResultPanel
 
--- Tombol Minimize Search
 local srMinBtn = Instance.new("TextButton")
 srMinBtn.Size = UDim2.new(0, 20, 0, 20)
 srMinBtn.Position = UDim2.new(1, -50, 0, 5)
@@ -208,7 +304,6 @@ srMinBtn.Text = "-"
 srMinBtn.Parent = searchResultPanel
 Instance.new("UICorner", srMinBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Close Search
 local srCloseBtn = Instance.new("TextButton")
 srCloseBtn.Size = UDim2.new(0, 20, 0, 20)
 srCloseBtn.Position = UDim2.new(1, -25, 0, 5)
@@ -259,7 +354,6 @@ local srLayout = Instance.new("UIListLayout")
 srLayout.SortOrder = Enum.SortOrder.LayoutOrder
 srLayout.Parent = srScroll
 
--- Logic Minimize Search
 local isSearchMinimized = false
 srMinBtn.MouseButton1Click:Connect(function()
 	isSearchMinimized = not isSearchMinimized
@@ -277,8 +371,6 @@ end)
 srCloseBtn.MouseButton1Click:Connect(function()
 	searchResultPanel.Visible = false
 end)
-
-makeDraggable(searchResultPanel)
 
 -------------------------------------------------
 -- PLAYER LIST GUI
@@ -306,7 +398,6 @@ plTitle.TextXAlignment = Enum.TextXAlignment.Left
 plTitle.TextSize = 14
 plTitle.Parent = playerListPanel
 
--- Tombol Minimize Player List
 local plMinBtn = Instance.new("TextButton")
 plMinBtn.Size = UDim2.new(0, 20, 0, 20)
 plMinBtn.Position = UDim2.new(1, -50, 0, 5)
@@ -318,7 +409,6 @@ plMinBtn.Text = "-"
 plMinBtn.Parent = playerListPanel
 Instance.new("UICorner", plMinBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Close Player List
 local plCloseBtn = Instance.new("TextButton")
 plCloseBtn.Size = UDim2.new(0, 20, 0, 20)
 plCloseBtn.Position = UDim2.new(1, -25, 0, 5)
@@ -341,7 +431,7 @@ searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 searchBox.Font = Enum.Font.Gotham
 searchBox.TextSize = 14
 searchBox.Text = ""
-searchBox.ClearTextOnFocus = false -- UPDATE: Tidak menghapus teks saat diklik
+searchBox.ClearTextOnFocus = false
 searchBox.Parent = playerListPanel
 Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 4)
 
@@ -416,43 +506,17 @@ local markBtn = createMenuButton("Mark", 70, Color3.fromRGB(100, 0, 150))
 local deleteBtn = createMenuButton("Delete", 100, Color3.fromRGB(255, 0, 0))
 
 -------------------------------------------------
--- VARIABLES
+-- TOGGLE PIN & EVIL MODE
 -------------------------------------------------
 
-local selectedObject
-local selectedOriginalColor
-local broughtObjects = {}
-local lastClick = 0
-local lastObject
-local originalTransparency = {}
-local originalColors = {}
-local objectLabels = {}
-
-local ghostSphere = nil
-local ghostConnections = {}
-local mobileControls = nil
-
-local markedCFrame = nil
-local tempMarkCFrame = nil
-local isUndoMode = false
-local undoThread = nil
-
-local spectatingPlayer = nil
-local spectatingConnection = nil
-local playerRows = {}
-
-local isEvilMode = false
-local isMinimized = false
-local originalSize = panel.Size
-
--- Variable untuk Search
-local currentSearchResults = {} -- Menyimpan {Object, RowFrame, DistLabel}
-local currentSearchTerm = ""
-local searchLoopConnection = nil
-
--------------------------------------------------
--- EVIL MODE TOGGLE
--------------------------------------------------
+pinBtn.MouseButton1Click:Connect(function()
+	isPinned = not isPinned
+	if isPinned then
+		pinBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+	else
+		pinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+end)
 
 evilBtn.MouseButton1Click:Connect(function()
 	isEvilMode = not isEvilMode
@@ -494,7 +558,7 @@ minBtn.MouseButton1Click:Connect(function()
 end)
 
 -------------------------------------------------
--- COMMAND LOGIC (On Enter -> Realtime Loop)
+-- COMMAND LOGIC
 -------------------------------------------------
 
 local function getObjectPosition(obj)
@@ -517,14 +581,24 @@ local function clearSearchRows()
 	currentSearchResults = {}
 end
 
+local function handleAutoMarking()
+	if autoMarkingActive then
+		local char = player.Character
+		if char then
+			local hrp = char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				markedCFrame = hrp.CFrame
+			end
+		end
+	end
+end
+
 local function performSearch(searchName)
 	if #searchName < 1 then return end
 
-	-- Hapus hasil lama
 	clearSearchRows()
 	currentSearchTerm = searchName
 
-	-- Lakukan Scan Workspace (Hanya sekali saat Enter)
 	local foundObjects = {}
 	local myChar = player.Character
 	local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -547,7 +621,6 @@ local function performSearch(searchName)
 	searchResultPanel.Visible = true
 	srTitle.Text = "Search: " .. searchName .. " (" .. #foundObjects .. " found)"
 
-	-- Buat UI untuk hasil
 	for i, data in pairs(foundObjects) do
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, 0, 0, 25)
@@ -559,7 +632,6 @@ local function performSearch(searchName)
 
 		local xPos = 5
 
-		-- No
 		local noL = Instance.new("TextLabel")
 		noL.Size = UDim2.new(0, srColWidths[1], 1, 0)
 		noL.Position = UDim2.new(0, xPos, 0, 0)
@@ -571,7 +643,6 @@ local function performSearch(searchName)
 		noL.Parent = row
 		xPos = xPos + srColWidths[1]
 
-		-- Name
 		local nameL = Instance.new("TextLabel")
 		nameL.Size = UDim2.new(0, srColWidths[2], 1, 0)
 		nameL.Position = UDim2.new(0, xPos, 0, 0)
@@ -584,7 +655,6 @@ local function performSearch(searchName)
 		nameL.Parent = row
 		xPos = xPos + srColWidths[2]
 
-		-- Distance
 		local distL = Instance.new("TextLabel")
 		distL.Size = UDim2.new(0, srColWidths[3], 1, 0)
 		distL.Position = UDim2.new(0, xPos, 0, 0)
@@ -596,7 +666,6 @@ local function performSearch(searchName)
 		distL.Parent = row
 		xPos = xPos + srColWidths[3]
 
-		-- Teleport Button
 		local tpB = Instance.new("TextButton")
 		tpB.Size = UDim2.new(0, srColWidths[4] - 10, 1, -4)
 		tpB.Position = UDim2.new(0, xPos + 5, 0, 2)
@@ -614,8 +683,8 @@ local function performSearch(searchName)
 				local hrp = char:FindFirstChild("HumanoidRootPart")
 				local pos = getObjectPosition(data.Object)
 				if hrp and pos then
+					handleAutoMarking()
 					hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
-					-- Auto Re-scan setelah teleport
 					task.wait(0.5)
 					performSearch(currentSearchTerm)
 				end
@@ -630,7 +699,6 @@ local function performSearch(searchName)
 	end)
 	srScroll.CanvasSize = UDim2.new(0, 0, 0, srLayout.AbsoluteContentSize.Y)
 
-	-- Mulai Loop Realtime untuk Update Jarak & Sort (Hanya jika belum berjalan)
 	if not searchLoopConnection then
 		searchLoopConnection = RunService.RenderStepped:Connect(function()
 			if not searchResultPanel.Visible then return end
@@ -643,7 +711,7 @@ local function performSearch(searchName)
 					if pos and myHrp then
 						local dist = (pos - myHrp.Position).Magnitude
 						data.DistLabel.Text = string.format("%.0f", dist)
-						data.Row.LayoutOrder = math.floor(dist) -- Sort otomatis
+						data.Row.LayoutOrder = math.floor(dist)
 					else
 						data.DistLabel.Text = "N/A"
 						data.Row.LayoutOrder = 99999
@@ -656,24 +724,36 @@ local function performSearch(searchName)
 	end
 end
 
--- Trigger via Tombol Enter UI
 enterBtn.MouseButton1Click:Connect(function()
 	local text = cmdBox.Text
 	if string.sub(text, 1, 2) == "w:" then
 		local searchName = string.sub(text, 3)
 		performSearch(searchName)
-	else
-		-- Logika lain jika bukan w: (opsional)
+	elseif string.lower(text) == "automarkingon" then
+		autoMarkingActive = true
+		showRainbowNotification("auto marking on")
+		cmdBox.Text = ""
+	elseif string.lower(text) == "automarkingoff" then
+		autoMarkingActive = false
+		showRainbowNotification("auto marking off")
+		cmdBox.Text = ""
 	end
 end)
 
--- Trigger via Keyboard Enter
 cmdBox.FocusLost:Connect(function(enterPressed)
 	if enterPressed then
 		local text = cmdBox.Text
 		if string.sub(text, 1, 2) == "w:" then
 			local searchName = string.sub(text, 3)
 			performSearch(searchName)
+		elseif string.lower(text) == "automarkingon" then
+			autoMarkingActive = true
+			showRainbowNotification("auto marking on")
+			cmdBox.Text = ""
+		elseif string.lower(text) == "automarkingoff" then
+			autoMarkingActive = false
+			showRainbowNotification("auto marking off")
+			cmdBox.Text = ""
 		end
 	end
 end)
@@ -684,6 +764,7 @@ end)
 
 makeDraggable(panel)
 makeDraggable(playerListPanel)
+makeDraggable(searchResultPanel)
 
 -------------------------------------------------
 -- BUTTON TOGGLE
@@ -1022,6 +1103,7 @@ teleportBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if hrp then
+		handleAutoMarking()
 		local originalLookVector = hrp.CFrame.LookVector
 		local targetPosition = selectedObject.CFrame.Position + Vector3.new(0, 5, 0)
 		hrp.CFrame = CFrame.new(targetPosition, targetPosition + originalLookVector)
@@ -1083,30 +1165,47 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 	end
 
 	if not markedCFrame then
-		tpMarkBtn.Text = "No Mark!"
-		task.wait(0.5)
-		tpMarkBtn.Text = "Teleport"
+		if autoMarkingActive then
+			markedCFrame = hrp.CFrame
+			tpMarkBtn.Text = "Mark Set"
+			task.wait(0.5)
+			tpMarkBtn.Text = "Teleport"
+		else
+			tpMarkBtn.Text = "No Mark!"
+			task.wait(0.5)
+			tpMarkBtn.Text = "Teleport"
+		end
 		return
 	end
 
-	tempMarkCFrame = hrp.CFrame
-	hrp.CFrame = CFrame.new(markedCFrame.Position, markedCFrame.Position + hrp.CFrame.LookVector)
+	if autoMarkingActive then
+		local targetCFrame = markedCFrame
+		markedCFrame = hrp.CFrame
+		hrp.CFrame = CFrame.new(targetCFrame.Position, targetCFrame.Position + hrp.CFrame.LookVector)
 
-	isUndoMode = true
-	tpMarkBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-	undoThread = task.spawn(function()
-		for i = 10, 0, -1 do
-			if not isUndoMode then break end
-			tpMarkBtn.Text = "Undo (" .. tostring(i) .. ")"
-			task.wait(1)
-		end
-		if isUndoMode then
-			isUndoMode = false
-			tempMarkCFrame = nil
-			tpMarkBtn.Text = "Teleport"
-			tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-		end
-	end)
+		tpMarkBtn.Text = "Jump!"
+		task.wait(0.5)
+		tpMarkBtn.Text = "Teleport"
+	else
+		tempMarkCFrame = hrp.CFrame
+		hrp.CFrame = CFrame.new(markedCFrame.Position, markedCFrame.Position + hrp.CFrame.LookVector)
+
+		isUndoMode = true
+		tpMarkBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+		undoThread = task.spawn(function()
+			for i = 10, 0, -1 do
+				if not isUndoMode then break end
+				tpMarkBtn.Text = "Undo (" .. tostring(i) .. ")"
+				task.wait(1)
+			end
+			if isUndoMode then
+				isUndoMode = false
+				tempMarkCFrame = nil
+				tpMarkBtn.Text = "Teleport"
+				tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+			end
+		end)
+	end
 end)
 
 -------------------------------------------------
@@ -1158,7 +1257,6 @@ local function createPlayerRow(plr, index)
 
 	local xPos = 5
 
-	-- No
 	local noL = Instance.new("TextLabel")
 	noL.Size = UDim2.new(0, colWidths[1], 1, 0)
 	noL.Position = UDim2.new(0, xPos, 0, 0)
@@ -1170,7 +1268,6 @@ local function createPlayerRow(plr, index)
 	noL.Parent = row
 	xPos = xPos + colWidths[1]
 
-	-- Name
 	local nameL = Instance.new("TextLabel")
 	nameL.Size = UDim2.new(0, colWidths[2], 1, 0)
 	nameL.Position = UDim2.new(0, xPos, 0, 0)
@@ -1183,7 +1280,6 @@ local function createPlayerRow(plr, index)
 	nameL.Parent = row
 	xPos = xPos + colWidths[2]
 
-	-- NickName
 	local nickL = Instance.new("TextLabel")
 	nickL.Size = UDim2.new(0, colWidths[3], 1, 0)
 	nickL.Position = UDim2.new(0, xPos, 0, 0)
@@ -1196,7 +1292,6 @@ local function createPlayerRow(plr, index)
 	nickL.Parent = row
 	xPos = xPos + colWidths[3]
 
-	-- Distance
 	local distL = Instance.new("TextLabel")
 	distL.Size = UDim2.new(0, colWidths[4], 1, 0)
 	distL.Position = UDim2.new(0, xPos, 0, 0)
@@ -1208,7 +1303,6 @@ local function createPlayerRow(plr, index)
 	distL.Parent = row
 	xPos = xPos + colWidths[4]
 
-	-- TP Button
 	local tpB = Instance.new("TextButton")
 	tpB.Size = UDim2.new(0, colWidths[5] - 10, 1, -4)
 	tpB.Position = UDim2.new(0, xPos + 5, 0, 2)
@@ -1227,6 +1321,7 @@ local function createPlayerRow(plr, index)
 			local thrp = char:FindFirstChild("HumanoidRootPart")
 			local myhrp = myChar:FindFirstChild("HumanoidRootPart")
 			if thrp and myhrp then
+				handleAutoMarking()
 				local behindPos = thrp.CFrame.Position - (thrp.CFrame.LookVector * 10)
 				myhrp.CFrame = CFrame.new(behindPos)
 			end
@@ -1234,7 +1329,6 @@ local function createPlayerRow(plr, index)
 	end)
 	xPos = xPos + colWidths[5]
 
-	-- Cam Button
 	local camB = Instance.new("TextButton")
 	camB.Size = UDim2.new(0, colWidths[6] - 10, 1, -4)
 	camB.Position = UDim2.new(0, xPos + 5, 0, 2)
@@ -1274,7 +1368,6 @@ local function createPlayerRow(plr, index)
 	playerRows[plr] = {Row = row, DistLabel = distL, CamBtn = camB, NameLabel = nameL, NickLabel = nickL}
 end
 
--- Update Loop
 RunService.RenderStepped:Connect(function()
 	local myChar = player.Character
 	if not myChar then return end
@@ -1293,7 +1386,6 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Search Logic
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local text = string.lower(searchBox.Text)
 	for plr, data in pairs(playerRows) do
@@ -1308,7 +1400,6 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	scrollingFrame.CanvasPosition = Vector2.new(0, 0)
 end)
 
--- Init & Fix Scroll Canvas Size
 local function initPlayerList()
 	for _, data in pairs(playerRows) do if data.Row then data.Row:Destroy() end end
 	playerRows = {}
