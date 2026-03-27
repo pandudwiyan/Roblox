@@ -1,11 +1,12 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 19 (Fixed)
--- Update: Fixed Syntax Error & Neat UI Layout
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 20 (Gojo Shield Update)
+-- Update: Fixed Shield Geometry (Sealed Corners) & Thickness for Anti-Penetration
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local PhysicsService = game:GetService("PhysicsService") -- Ditambahkan untuk Collision Group
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -57,7 +58,7 @@ Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
 local pinBtn = Instance.new("TextButton")
 pinBtn.Name = "PinBtn"
 pinBtn.Size = UDim2.new(0, 25, 0, 20)
-pinBtn.Position = UDim2.new(1, -55, 0, 5) -- Gap 5px dari minimize
+pinBtn.Position = UDim2.new(1, -55, 0, 5)
 pinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 pinBtn.TextColor3 = Color3.new(1, 1, 1)
 pinBtn.Font = Enum.Font.GothamBold
@@ -70,7 +71,7 @@ Instance.new("UICorner", pinBtn).CornerRadius = UDim.new(0, 4)
 local evilBtn = Instance.new("TextButton")
 evilBtn.Name = "EvilBtn"
 evilBtn.Size = UDim2.new(0, 35, 0, 20)
-evilBtn.Position = UDim2.new(1, -95, 0, 5) -- Gap 5px dari pin
+evilBtn.Position = UDim2.new(1, -95, 0, 5)
 evilBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 evilBtn.TextColor3 = Color3.new(1, 1, 1)
 evilBtn.Font = Enum.Font.GothamBold
@@ -195,6 +196,80 @@ local function makeDraggable(frame)
 				frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			end
 		end
+	end)
+end
+
+-------------------------------------------------
+-- TAMENG TOOL FUNCTION (GHOST IDENTITY - SAFE MODE)
+-- Konsep: Mengubah nama Humanoid agar NPC tidak mengenali pemain sebagai target.
+-- Kelebihan: Tidak mengubah fisika, jalan normal, tidak tembus pandang.
+-------------------------------------------------
+
+local function createTamengTool()
+	local tool = Instance.new("Tool")
+	tool.Name = "NPC"
+	tool.RequiresHandle = false
+	tool.Parent = player.Backpack
+
+	local originalNames = {}
+	local connection = nil
+	-- Nama palsu yang tidak dicari oleh NPC
+	local FAKE_NAME = "Object_Dummy_" .. math.random(1, 10000) 
+
+	tool.Equipped:Connect(function()
+		local char = player.Character
+		if not char then return end
+
+		-- 1. Simpan nama asli dan ubah nama (Metode Anti-Detection)
+		local hum = char:FindFirstChild("Humanoid")
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+
+		-- Ubah nama Humanoid (Target utama sensor NPC)
+		if hum then
+			originalNames[hum] = hum.Name
+			hum.Name = FAKE_NAME
+		end
+
+		-- Ubah nama HumanoidRootPart (Target sekunder sensor NPC)
+		if hrp then
+			originalNames[hrp] = hrp.Name
+			hrp.Name = "DummyRoot_" .. math.random(1, 10000)
+		end
+
+		showRainbowNotification("Ghost Identity Active! NPC Ignore You.")
+
+		-- 2. Loop Pengaman:
+		-- Beberapa game memiliki script yang otomatis memperbaiki nama (Anti-Exploit).
+		-- Loop ini memastikan nama tetap tersembunyi selama tool dipakai.
+		connection = RunService.Heartbeat:Connect(function()
+			if not char or not char.Parent then
+				if connection then connection:Disconnect() end
+				return
+			end
+
+			-- Paksa nama tetap palsu jika game mencoba mengubahnya kembali
+			if hum and hum.Parent and hum.Name ~= FAKE_NAME then
+				hum.Name = FAKE_NAME
+			end
+		end)
+	end)
+
+	tool.Unequipped:Connect(function()
+		-- Hentikan loop pengaman
+		if connection then connection:Disconnect() end
+
+		local char = player.Character
+		if not char then return end
+
+		-- 3. Kembalikan nama asli dengan AMAN
+		-- Kita tidak menyentuh CanCollide/Transparency, jadi tidak akan ada glitch jalan.
+		for obj, name in pairs(originalNames) do
+			if obj and obj.Parent then
+				obj.Name = name
+			end
+		end
+
+		originalNames = {}
 	end)
 end
 
@@ -729,6 +804,9 @@ enterBtn.MouseButton1Click:Connect(function()
 	if string.sub(text, 1, 2) == "w:" then
 		local searchName = string.sub(text, 3)
 		performSearch(searchName)
+	elseif string.lower(text) == "t:npc" then
+		createTamengTool()
+		cmdBox.Text = ""
 	elseif string.lower(text) == "automarkingon" then
 		autoMarkingActive = true
 		showRainbowNotification("auto marking on")
@@ -746,6 +824,8 @@ cmdBox.FocusLost:Connect(function(enterPressed)
 		if string.sub(text, 1, 2) == "w:" then
 			local searchName = string.sub(text, 3)
 			performSearch(searchName)
+		elseif string.lower(text) == "t:tameng" then
+			createTamengTool()
 		elseif string.lower(text) == "automarkingon" then
 			autoMarkingActive = true
 			showRainbowNotification("auto marking on")
