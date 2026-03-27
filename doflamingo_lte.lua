@@ -200,77 +200,120 @@ local function makeDraggable(frame)
 end
 
 -------------------------------------------------
--- TAMENG TOOL FUNCTION (GHOST IDENTITY - SAFE MODE)
--- Konsep: Mengubah nama Humanoid agar NPC tidak mengenali pemain sebagai target.
--- Kelebihan: Tidak mengubah fisika, jalan normal, tidak tembus pandang.
+-- TAMENG TOOL FUNCTION (FIXED THICKNESS & COLLISION)
 -------------------------------------------------
 
 local function createTamengTool()
 	local tool = Instance.new("Tool")
-	tool.Name = "NPC"
+	tool.Name = "Tameng"
 	tool.RequiresHandle = false
 	tool.Parent = player.Backpack
 
-	local originalNames = {}
+	local shieldParts = {}
 	local connection = nil
-	-- Nama palsu yang tidak dicari oleh NPC
-	local FAKE_NAME = "Object_Dummy_" .. math.random(1, 10000) 
+	local groupName = "TamengShield_" .. player.Name
+
+	-- 1. Setup Collision Group (Hanya perlu sekali)
+	pcall(function()
+		PhysicsService:CreateCollisionGroup(groupName)
+		-- Perisai BERTABRAKAN dengan benda Default (Benda lain)
+		PhysicsService:CollisionGroupSetCollidable(groupName, "Default", true)
+		-- Perisai TIDAK BERTABRAKAN dengan dirinya sendiri (agar tidak bug)
+		PhysicsService:CollisionGroupSetCollidable(groupName, groupName, false)
+	end)
 
 	tool.Equipped:Connect(function()
 		local char = player.Character
 		if not char then return end
+		local hrp = char:WaitForChild("HumanoidRootPart")
 
-		-- 1. Simpan nama asli dan ubah nama (Metode Anti-Detection)
-		local hum = char:FindFirstChild("Humanoid")
-		local hrp = char:FindFirstChild("HumanoidRootPart")
+		-- Hapus part lama jika ada
+		for _, p in pairs(shieldParts) do if p then p:Destroy() end end
+		shieldParts = {}
 
-		-- Ubah nama Humanoid (Target utama sensor NPC)
-		if hum then
-			originalNames[hum] = hum.Name
-			hum.Name = FAKE_NAME
+		-- Set karakter pemain ke group yang sama agar tidak tertahan perisainya sendiri
+		pcall(function()
+			for _, part in pairs(char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					PhysicsService:SetPartCollisionGroup(part, groupName)
+				end
+			end
+		end)
+
+		-- Fungsi membuat part pelindung
+		local function createPart(name)
+			local p = Instance.new("Part")
+			p.Name = name
+			-- UKURAN DIPERBESAR: 16x16 dengan KETEBALAN 5 STUD (Anti-Tembus)
+			p.Size = Vector3.new(16, 16, 5) 
+			p.Anchored = true
+			p.CanCollide = true
+			p.Transparency = 0.7
+			p.Color = Color3.fromRGB(0, 255, 255)
+			p.Material = Enum.Material.ForceField
+			p.Parent = Workspace
+
+			-- Masukkan ke collision group khusus
+			pcall(function() PhysicsService:SetPartCollisionGroup(p, groupName) end)
+
+			table.insert(shieldParts, p)
+			return p
 		end
 
-		-- Ubah nama HumanoidRootPart (Target sekunder sensor NPC)
-		if hrp then
-			originalNames[hrp] = hrp.Name
-			hrp.Name = "DummyRoot_" .. math.random(1, 10000)
-		end
+		-- Buat 5 sisi
+		local front = createPart("Shield_Front")
+		local back = createPart("Shield_Back")
+		local right = createPart("Shield_Right")
+		local left = createPart("Shield_Left")
+		local top = createPart("Shield_Top")
 
-		showRainbowNotification("Ghost Identity Active! NPC Ignore You.")
-
-		-- 2. Loop Pengaman:
-		-- Beberapa game memiliki script yang otomatis memperbaiki nama (Anti-Exploit).
-		-- Loop ini memastikan nama tetap tersembunyi selama tool dipakai.
-		connection = RunService.Heartbeat:Connect(function()
-			if not char or not char.Parent then
+		-- Loop Update Posisi
+		connection = RunService.RenderStepped:Connect(function()
+			if not hrp or not hrp.Parent then
+				for _, p in pairs(shieldParts) do if p then p:Destroy() end end
 				if connection then connection:Disconnect() end
 				return
 			end
 
-			-- Paksa nama tetap palsu jika game mencoba mengubahnya kembali
-			if hum and hum.Parent and hum.Name ~= FAKE_NAME then
-				hum.Name = FAKE_NAME
-			end
+			local cf = hrp.CFrame
+			-- Offset 8 stud. 
+			-- Karena tebal 5 stud, permukaan dalam ada di (8 - 2.5) = 5.5 stud.
+			-- Permukaan luar ada di (8 + 2.5) = 10.5 stud. Sangat tebal & aman.
+
+			-- Front (Menghadap -Z / Depan)
+			front.CFrame = cf * CFrame.new(0, 0, -8) * CFrame.Angles(0, 0, 0)
+			-- Back (Menghadap +Z / Belakang)
+			back.CFrame = cf * CFrame.new(0, 0, 8) * CFrame.Angles(0, math.rad(180), 0)
+			-- Right (Menghadap +X / Kanan)
+			right.CFrame = cf * CFrame.new(8, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
+			-- Left (Menghadap -X / Kiri)
+			left.CFrame = cf * CFrame.new(-8, 0, 0) * CFrame.Angles(0, math.rad(-90), 0)
+			-- Top (Atas)
+			top.CFrame = cf * CFrame.new(0, 8, 0) * CFrame.Angles(math.rad(-90), 0, 0)
 		end)
 	end)
 
 	tool.Unequipped:Connect(function()
-		-- Hentikan loop pengaman
 		if connection then connection:Disconnect() end
-
-		local char = player.Character
-		if not char then return end
-
-		-- 3. Kembalikan nama asli dengan AMAN
-		-- Kita tidak menyentuh CanCollide/Transparency, jadi tidak akan ada glitch jalan.
-		for obj, name in pairs(originalNames) do
-			if obj and obj.Parent then
-				obj.Name = name
-			end
+		for _, p in pairs(shieldParts) do
+			if p then p:Destroy() end
 		end
+		shieldParts = {}
 
-		originalNames = {}
+		-- Kembalikan collision group karakter ke Default saat perisai dilepas
+		local char = player.Character
+		if char then
+			pcall(function()
+				for _, part in pairs(char:GetDescendants()) do
+					if part:IsA("BasePart") then
+						PhysicsService:SetPartCollisionGroup(part, "Default")
+					end
+				end
+			end)
+		end
 	end)
+
+	showRainbowNotification("Infinity Shield Activated!")
 end
 
 -------------------------------------------------
@@ -804,7 +847,7 @@ enterBtn.MouseButton1Click:Connect(function()
 	if string.sub(text, 1, 2) == "w:" then
 		local searchName = string.sub(text, 3)
 		performSearch(searchName)
-	elseif string.lower(text) == "t:npc" then
+	elseif string.lower(text) == "t:tameng" then
 		createTamengTool()
 		cmdBox.Text = ""
 	elseif string.lower(text) == "automarkingon" then
