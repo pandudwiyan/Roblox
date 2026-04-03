@@ -1,5 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 24
--- Update: Ghost Mode Teleport Override (Teleport to Eye)
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 25
+-- Fix: Object Mark Persistence (Survives Vision Toggle)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -95,11 +95,12 @@ local originalTransparency = {}
 local originalColors = {}
 local objectLabels = {}
 
-local ghostSphere = nil -- Variabel penting untuk fitur ghost
+local ghostSphere = nil 
 local ghostConnections = {}
 local mobileControls = nil
 
 local markedCFrame = nil
+local markedObjectInstance = nil -- Variabel untuk Object Mark (Persisten)
 local tempMarkCFrame = nil
 local isUndoMode = false
 local undoThread = nil
@@ -333,7 +334,6 @@ srHeader.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 srHeader.Parent = srContainer
 Instance.new("UICorner", srHeader).CornerRadius = UDim.new(0, 4)
 
--- Updated Widths for better fit
 local srColWidths = {35, 200, 60, 280} 
 local srHeaders = {"No", "Name", "Dist", "Action"}
 local srXPos = 5
@@ -611,7 +611,6 @@ end
 
 local function stopSpectate()
 	if spectatingTarget then
-		-- If spectating a label (table), handle cleanup
 		if type(spectatingTarget) == "table" and spectatingTarget.Marker then
 			spectatingTarget.Marker:Destroy()
 		end
@@ -629,26 +628,22 @@ local function stopSpectate()
 end
 
 local function toggleLine(objOrLabel, btn)
-	-- objOrLabel can be an Instance (Object) or a Table (Label Data)
 	local isLabel = type(objOrLabel) == "table"
 	local position = isLabel and objOrLabel.Position or getObjectPosition(objOrLabel)
 
 	if activeLines[objOrLabel] then
-		-- Remove Line
 		if activeLines[objOrLabel].Beam then activeLines[objOrLabel].Beam:Destroy() end
 		if activeLines[objOrLabel].Attach then activeLines[objOrLabel].Attach:Destroy() end
-		if activeLines[objOrLabel].Part then activeLines[objOrLabel].Part:Destroy() end -- Cleanup label marker part
+		if activeLines[objOrLabel].Part then activeLines[objOrLabel].Part:Destroy() end 
 		activeLines[objOrLabel] = nil
 		btn.Text = "Line"
 		btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 	else
-		-- Add Line
 		local origin = ensureLineOrigin()
 		if origin and position then
 			local targetPart
 
 			if isLabel then
-				-- Create invisible part for label
 				local p = Instance.new("Part")
 				p.Name = "LabelLineMarker"
 				p.Size = Vector3.new(1,1,1)
@@ -700,7 +695,6 @@ local function spectateObject(objOrLabel, btn)
 		spectatingTarget = objOrLabel
 
 		if isLabel then
-			-- Create marker for spectating label
 			local p = Instance.new("Part")
 			p.Name = "LabelSpecMarker"
 			p.Size = Vector3.new(1,1,1)
@@ -710,7 +704,6 @@ local function spectateObject(objOrLabel, btn)
 			p.Position = position
 			p.Parent = Workspace
 
-			-- Store reference to clean up later
 			objOrLabel.Marker = p 
 
 			Workspace.CurrentCamera.CameraSubject = p
@@ -803,7 +796,7 @@ local function showLabelList()
 	searchResultPanel.Visible = true
 	srTitle.Text = "Saved Labels (" .. #savedLabels .. ")"
 
-	local actionBtnWidth = 45 -- Slightly smaller
+	local actionBtnWidth = 45 
 	local actionBtnGap = 3
 
 	local sortedLabels = {}
@@ -831,7 +824,6 @@ local function showLabelList()
 
 		local xPos = 5
 
-		-- No
 		local noL = Instance.new("TextLabel")
 		noL.Size = UDim2.new(0, srColWidths[1], 1, 0)
 		noL.Position = UDim2.new(0, xPos, 0, 0)
@@ -843,7 +835,6 @@ local function showLabelList()
 		noL.Parent = row
 		xPos = xPos + srColWidths[1]
 
-		-- Name
 		local nameL = Instance.new("TextLabel")
 		nameL.Size = UDim2.new(0, srColWidths[2], 1, 0)
 		nameL.Position = UDim2.new(0, xPos, 0, 0)
@@ -857,7 +848,6 @@ local function showLabelList()
 		nameL.Parent = row
 		xPos = xPos + srColWidths[2]
 
-		-- Distance
 		local distL = Instance.new("TextLabel")
 		distL.Size = UDim2.new(0, srColWidths[3], 1, 0)
 		distL.Position = UDim2.new(0, xPos, 0, 0)
@@ -869,10 +859,8 @@ local function showLabelList()
 		distL.Parent = row
 		xPos = xPos + srColWidths[3]
 
-		-- Action Buttons Container
 		local actionX = xPos + 5
 
-		-- Helper for buttons
 		local function createSrBtn(text, color, callback)
 			local b = Instance.new("TextButton")
 			b.Size = UDim2.new(0, actionBtnWidth, 1, -4)
@@ -890,15 +878,12 @@ local function showLabelList()
 			return b
 		end
 
-		-- 1. Teleport
 		createSrBtn("TP", Color3.fromRGB(0, 100, 200), function()
 			local char = player.Character
 			if char then
 				local hrp = char:FindFirstChild("HumanoidRootPart")
 				if hrp then
 					handleAutoMarking()
-
-					-- GHOST MODE OVERRIDE
 					if ghostBtn:GetAttribute("Active") and ghostSphere then
 						hrp.CFrame = ghostSphere.CFrame + Vector3.new(0, 3, 0)
 					else
@@ -908,18 +893,14 @@ local function showLabelList()
 			end
 		end)
 
-		-- 2. Spectate (Added)
 		createSrBtn("Spec", Color3.fromRGB(60, 60, 60), function()
-			-- We pass the data table as the identifier
 			spectateObject(data, btn)
 		end)
 
-		-- 3. Line (Added)
 		createSrBtn("Line", Color3.fromRGB(100, 100, 100), function()
 			toggleLine(data, btn)
 		end)
 
-		-- 4. Delete
 		createSrBtn("Del", Color3.fromRGB(200, 50, 50), function()
 			for idx, v in pairs(savedLabels) do
 				if v.Name == data.Name and v.Position == data.Position then
@@ -998,7 +979,7 @@ local function performSearch(searchName)
 	searchResultPanel.Visible = true
 	srTitle.Text = "Search: " .. searchName .. " (" .. #foundObjects .. " found)"
 
-	local actionBtnWidth = 45 -- Adjusted
+	local actionBtnWidth = 45 
 	local actionBtnGap = 3
 
 	for i, data in pairs(foundObjects) do
@@ -1066,7 +1047,6 @@ local function performSearch(searchName)
 			return b
 		end
 
-		-- 1. Teleport
 		createSrBtn("TP", Color3.fromRGB(0, 100, 200), function()
 			local char = player.Character
 			if char and data.Object then
@@ -1074,37 +1054,30 @@ local function performSearch(searchName)
 				local pos = getObjectPosition(data.Object)
 				if hrp and pos then
 					handleAutoMarking()
-
-					-- GHOST MODE OVERRIDE
 					if ghostBtn:GetAttribute("Active") and ghostSphere then
 						hrp.CFrame = ghostSphere.CFrame + Vector3.new(0, 3, 0)
 					else
 						hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
 					end
-
 					task.wait(0.5)
 					performSearch(currentSearchTerm)
 				end
 			end
 		end)
 
-		-- 2. Spectate
 		createSrBtn("Spec", Color3.fromRGB(60, 60, 60), function()
 			spectateObject(data.Object, btn)
 		end)
 
-		-- 3. Bring (Toggle)
 		local isBrought = broughtObjects[data.Object] ~= nil
 		createSrBtn(isBrought and "Unbring" or "Bring", isBrought and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 180, 0), function()
 			toggleBring(data.Object, btn)
 		end)
 
-		-- 4. Line
 		createSrBtn("Line", Color3.fromRGB(100, 100, 100), function()
 			toggleLine(data.Object, btn)
 		end)
 
-		-- 5. Delete
 		createSrBtn("Del", Color3.fromRGB(200, 50, 50), function()
 			deleteObject(data.Object)
 			task.wait(0.1)
@@ -1440,7 +1413,7 @@ local function toggleVision()
 							label.Name = "NameLabel"
 							label.Size = UDim2.new(0, 100, 0, 20)
 							label.StudsOffset = Vector3.new(0, 2.5, 0)
-							label.AlwaysOnTop = true -- FIX: Agar text selalu di atas objek lain
+							label.AlwaysOnTop = true 
 							label.Parent = head
 							local textLabel = Instance.new("TextLabel")
 							textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -1462,7 +1435,7 @@ local function toggleVision()
 						label.Name = "NameLabel"
 						label.Size = UDim2.new(0, 100, 0, 20)
 						label.StudsOffset = Vector3.new(0, 2, 0)
-						label.AlwaysOnTop = true -- FIX: Agar text selalu di atas objek lain
+						label.AlwaysOnTop = true 
 						label.Parent = obj
 						local textLabel = Instance.new("TextLabel")
 						textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -1486,6 +1459,7 @@ local function toggleVision()
 		for _, label in pairs(objectLabels) do if label and label.Parent then label:Destroy() end end
 		objectLabels = {}
 		menu.Visible = false
+		-- PERBAIKAN: JANGAN hapus markedObjectInstance di sini agar bisa teleport meski vision off
 	end
 end
 
@@ -1552,7 +1526,6 @@ teleportBtn.MouseButton1Click:Connect(function()
 
 	handleAutoMarking()
 
-	-- GHOST MODE OVERRIDE
 	if ghostBtn:GetAttribute("Active") and ghostSphere then
 		hrp.CFrame = ghostSphere.CFrame + Vector3.new(0, 3, 0)
 		return
@@ -1566,10 +1539,27 @@ end)
 
 markBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
-	markedCFrame = selectedObject.CFrame
+
+	-- Hapus Mark lama jika berbeda object
+	if markedObjectInstance and markedObjectInstance ~= selectedObject then
+		if markedObjectInstance.Parent then
+			markedObjectInstance:SetAttribute("Marked", nil)
+		end
+	end
+
+	markedObjectInstance = selectedObject
+	markedCFrame = nil -- Prioritaskan Object Mark
+
 	selectedObject:SetAttribute("Marked", true)
-	selectedObject.Color = Color3.fromRGB(0, 255, 255)
+
+	-- Jika vision aktif, ubah warna. Jika tidak, tidak perlu (transparansi sudah normal)
+	if visionBtn:GetAttribute("Active") then
+		selectedObject.Color = Color3.fromRGB(0, 255, 255)
+	end
+
 	markBtn.Text = "Marked!"
+	showRainbowNotification("Marked Object: " .. selectedObject.Name)
+
 	task.wait(0.5)
 	markBtn.Text = "Mark"
 end)
@@ -1591,6 +1581,7 @@ markingBtn.MouseButton1Click:Connect(function()
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
+	markedObjectInstance = nil -- Hapus Object Mark jika pakai Coordinate Mark
 	markedCFrame = hrp.CFrame
 	markingBtn.Text = "Marked!"
 	markingBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
@@ -1612,6 +1603,8 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 		return
 	end
 
+	-- PERBAIKAN: PRIORITAS 1 adalah UNDO MODE
+	-- Ini harus dicek paling pertama agar bisa kembali ke posisi awal
 	if isUndoMode then
 		if tempMarkCFrame then
 			local currentLook = hrp.CFrame.LookVector
@@ -1622,9 +1615,43 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 		if undoThread then task.cancel(undoThread) end
 		tpMarkBtn.Text = "Teleport"
 		tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+		return -- Hentikan eksekusi agar tidak lanjut ke logic object mark
+	end
+
+	-- PRIORITAS 2: OBJECT MARK (Dinamis, bisa gerak)
+	-- Ini baru dijalankan jika TIDAK sedang dalam mode Undo
+	if markedObjectInstance and markedObjectInstance.Parent then
+		handleAutoMarking()
+
+		local pos = getObjectPosition(markedObjectInstance)
+		if pos then
+			tempMarkCFrame = hrp.CFrame -- Simpan posisi sekarang untuk undo
+			hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+
+			-- Aktivasi Undo Mode
+			isUndoMode = true
+			tpMarkBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+			if undoThread then task.cancel(undoThread) end
+			undoThread = task.spawn(function()
+				for i = 10, 0, -1 do
+					if not isUndoMode then break end
+					tpMarkBtn.Text = "Undo (" .. tostring(i) .. ")"
+					task.wait(1)
+				end
+				if isUndoMode then
+					isUndoMode = false
+					tempMarkCFrame = nil
+					tpMarkBtn.Text = "Teleport"
+					tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
+				end
+			end)
+		else
+			showRainbowNotification("Object position invalid")
+		end
 		return
 	end
 
+	-- PRIORITAS 3: COORDINATE MARK (Statis)
 	if not markedCFrame then
 		if autoMarkingActive then
 			markedCFrame = hrp.CFrame
@@ -1773,8 +1800,6 @@ local function createPlayerRow(plr, index)
 			local myhrp = myChar:FindFirstChild("HumanoidRootPart")
 			if myhrp then
 				handleAutoMarking()
-
-				-- GHOST MODE OVERRIDE
 				if ghostBtn:GetAttribute("Active") and ghostSphere then
 					myhrp.CFrame = ghostSphere.CFrame + Vector3.new(0, 3, 0)
 				else
