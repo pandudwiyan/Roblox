@@ -1,5 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 25
--- Fix: Object Mark Persistence (Survives Vision Toggle)
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 26
+-- Fix: Object Mark Persistence + Add Line Feature to Player List
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -385,7 +385,7 @@ end)
 
 local playerListPanel = Instance.new("Frame")
 playerListPanel.Name = "PlayerListPanel"
-playerListPanel.Size = UDim2.new(0, 480, 0, 300)
+playerListPanel.Size = UDim2.new(0, 520, 0, 300) -- Diperlebar sedikit untuk tambahan Line
 playerListPanel.Position = UDim2.new(0.3, 0, 0.3, 0)
 playerListPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 playerListPanel.BackgroundTransparency = 0.1
@@ -454,8 +454,9 @@ headerFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 headerFrame.Parent = listContainer
 Instance.new("UICorner", headerFrame).CornerRadius = UDim.new(0, 4)
 
-local colWidths = {35, 115, 115, 60, 65, 65}
-local headers = {"No", "Name", "NickName", "Dist", "TP", "Cam"}
+-- UPDATE: Tambah kolom "Line" (dari 6 jadi 7 kolom)
+local colWidths = {30, 100, 100, 55, 55, 55, 55} -- No, Name, NickName, Dist, TP, Cam, Line
+local headers = {"No", "Name", "NickName", "Dist", "TP", "Cam", "Line"}
 
 local xPos = 5
 for i, h in ipairs(headers) do
@@ -1697,7 +1698,7 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 end)
 
 -------------------------------------------------
--- PLAYER LIST SYSTEM
+-- PLAYER LIST SYSTEM (UPDATE: TAMBAHKAN LINE)
 -------------------------------------------------
 
 local isPlayerListMinimized = false
@@ -1709,12 +1710,12 @@ end)
 plMinBtn.MouseButton1Click:Connect(function()
 	isPlayerListMinimized = not isPlayerListMinimized
 	if isPlayerListMinimized then
-		playerListPanel.Size = UDim2.new(0, 480, 0, 30)
+		playerListPanel.Size = UDim2.new(0, 520, 0, 30)
 		plMinBtn.Text = "+"
 		listContainer.Visible = false
 		searchBox.Visible = false
 	else
-		playerListPanel.Size = UDim2.new(0, 480, 0, 300)
+		playerListPanel.Size = UDim2.new(0, 520, 0, 300)
 		plMinBtn.Text = "-"
 		listContainer.Visible = true
 		searchBox.Visible = true
@@ -1783,9 +1784,10 @@ local function createPlayerRow(plr, index)
 	distL.Parent = row
 	xPos = xPos + colWidths[4]
 
+	-- Tombol TP
 	local tpB = Instance.new("TextButton")
-	tpB.Size = UDim2.new(0, colWidths[5] - 10, 1, -4)
-	tpB.Position = UDim2.new(0, xPos + 5, 0, 2)
+	tpB.Size = UDim2.new(0, colWidths[5] - 8, 1, -4)
+	tpB.Position = UDim2.new(0, xPos + 4, 0, 2)
 	tpB.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 	tpB.Text = "TP"
 	tpB.TextColor3 = Color3.new(1, 1, 1)
@@ -1817,9 +1819,10 @@ local function createPlayerRow(plr, index)
 	end)
 	xPos = xPos + colWidths[5]
 
+	-- Tombol Cam
 	local camB = Instance.new("TextButton")
-	camB.Size = UDim2.new(0, colWidths[6] - 10, 1, -4)
-	camB.Position = UDim2.new(0, xPos + 5, 0, 2)
+	camB.Size = UDim2.new(0, colWidths[6] - 8, 1, -4)
+	camB.Position = UDim2.new(0, xPos + 4, 0, 2)
 	camB.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 	camB.Text = "Cam"
 	camB.TextColor3 = Color3.new(1, 1, 1)
@@ -1852,10 +1855,42 @@ local function createPlayerRow(plr, index)
 			end
 		end
 	end)
+	xPos = xPos + colWidths[6]
 
-	playerRows[plr] = {Row = row, DistLabel = distL, CamBtn = camB, NameLabel = nameL, NickLabel = nickL}
+	-- *** NEW: Tombol Line ***
+	local lineB = Instance.new("TextButton")
+	lineB.Size = UDim2.new(0, colWidths[7] - 8, 1, -4)
+	lineB.Position = UDim2.new(0, xPos + 4, 0, 2)
+	lineB.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Default abu-abu
+	lineB.Text = "Line"
+	lineB.TextColor3 = Color3.new(1, 1, 1)
+	lineB.Font = Enum.Font.GothamBold
+	lineB.TextSize = 11
+	lineB.Parent = row
+	Instance.new("UICorner", lineB).CornerRadius = UDim.new(0, 4)
+
+	lineB.MouseButton1Click:Connect(function()
+		-- Gunakan fungsi toggleLine yang sudah ada
+		-- Kirim player's character model sebagai target
+		if plr.Character then
+			toggleLine(plr.Character, lineB)
+		else
+			showRainbowNotification("Player character not found")
+		end
+	end)
+
+	-- Simpan semua referensi termasuk Line button
+	playerRows[plr] = {
+		Row = row, 
+		DistLabel = distL, 
+		CamBtn = camB, 
+		NameLabel = nameL, 
+		NickLabel = nickL,
+		LineBtn = lineB -- NEW: Simpan reference ke Line button
+	}
 end
 
+-- Update distance display
 RunService.RenderStepped:Connect(function()
 	local myChar = player.Character
 	if not myChar then return end
@@ -1874,6 +1909,7 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- Search filter
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local text = string.lower(searchBox.Text)
 	for plr, data in pairs(playerRows) do
@@ -1888,12 +1924,24 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	scrollingFrame.CanvasPosition = Vector2.new(0, 0)
 end)
 
+-- Initialize player list
 local function initPlayerList()
-	for _, data in pairs(playerRows) do if data.Row then data.Row:Destroy() end end
+	for _, data in pairs(playerRows) do 
+		if data.Row then 
+			data.Row:Destroy() 
+			-- Cleanup line jika ada saat destroy row
+			if data.LineBtn then
+				-- Reset line state jika perlu
+			end
+		end 
+	end
 	playerRows = {}
 	local i = 1
 	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player then createPlayerRow(plr, i); i = i + 1 end
+		if plr ~= player then 
+			createPlayerRow(plr, i) 
+			i = i + 1 
+		end
 	end
 	plTitle.Text = "Player ("..(i-1).." Player)"
 	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
@@ -1903,10 +1951,29 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 end)
 
-Players.PlayerAdded:Connect(function(plr) task.wait(1); initPlayerList() end)
+-- Handle player join/leave
+Players.PlayerAdded:Connect(function(plr) 
+	task.wait(1) 
+	initPlayerList() 
+end)
+
 Players.PlayerRemoving:Connect(function(plr)
-	if playerRows[plr] then if playerRows[plr].Row then playerRows[plr].Row:Destroy() end; playerRows[plr] = nil end
-	if spectatingPlayer == plr then stopSpectate() end
+	-- Cleanup line jika player keluar dan sedang aktif
+	if plr.Character and activeLines[plr.Character] then
+		toggleLine(plr.Character, playerRows[plr] and playerRows[plr].LineBtn)
+	end
+
+	if playerRows[plr] then 
+		if playerRows[plr].Row then 
+			playerRows[plr].Row:Destroy() 
+		end
+		playerRows[plr] = nil 
+	end
+
+	if spectatingPlayer == plr then 
+		stopSpectate() 
+	end
+
 	initPlayerList()
 end)
 
