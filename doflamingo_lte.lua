@@ -1,5 +1,5 @@
--- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 26
--- Fix: Object Mark Persistence + Add Line Feature to Player List
+-- Floating Tools UI (PC + Mobile) - Ghost Sphere Rev 27
+-- Fix: Object Mark Persistence + Add Line Feature + ADD FREEZE FEATURE
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -20,7 +20,7 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 245, 0, 95)
+panel.Size = UDim2.new(0, 280, 0, 95) -- Diperlebar sedikit untuk muat tombol baru
 panel.Position = UDim2.new(0.05, 0, 0.7, 0)
 panel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 panel.BackgroundTransparency = 0.3
@@ -30,7 +30,7 @@ panel.Parent = gui
 Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 8)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -105, 0, 20)
+title.Size = UDim2.new(1, -120, 0, 20) -- Adjust size title
 title.Position = UDim2.new(0, 10, 0, 5)
 title.BackgroundTransparency = 1
 title.Text = "SKIZOO"
@@ -56,28 +56,41 @@ Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
 -- Tombol Pin
 local pinBtn = Instance.new("TextButton")
 pinBtn.Name = "PinBtn"
-pinBtn.Size = UDim2.new(0, 25, 0, 20)
-pinBtn.Position = UDim2.new(1, -55, 0, 5)
+pinBtn.Size = UDim2.new(0, 30, 0, 20)
+pinBtn.Position = UDim2.new(1, -60, 0, 5)
 pinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 pinBtn.TextColor3 = Color3.new(1, 1, 1)
 pinBtn.Font = Enum.Font.GothamBold
 pinBtn.TextSize = 12
-pinBtn.Text = "pin"
+pinBtn.Text = "PIN"
 pinBtn.Parent = panel
 Instance.new("UICorner", pinBtn).CornerRadius = UDim.new(0, 4)
 
 -- Tombol Evil
 local evilBtn = Instance.new("TextButton")
 evilBtn.Name = "EvilBtn"
-evilBtn.Size = UDim2.new(0, 35, 0, 20)
-evilBtn.Position = UDim2.new(1, -95, 0, 5)
+evilBtn.Size = UDim2.new(0, 40, 0, 20)
+evilBtn.Position = UDim2.new(1, -105, 0, 5)
 evilBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 evilBtn.TextColor3 = Color3.new(1, 1, 1)
 evilBtn.Font = Enum.Font.GothamBold
 evilBtn.TextSize = 12
-evilBtn.Text = "Evil"
+evilBtn.Text = "EVIL"
 evilBtn.Parent = panel
 Instance.new("UICorner", evilBtn).CornerRadius = UDim.new(0, 4)
+
+-- [NEW] Tombol Freeze
+local freezeBtn = Instance.new("TextButton")
+freezeBtn.Name = "FreezeBtn"
+freezeBtn.Size = UDim2.new(0, 75, 0, 20)
+freezeBtn.Position = UDim2.new(1, -185, 0, 5) -- Posisi di sebelah kiri Evil
+freezeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+freezeBtn.TextColor3 = Color3.new(1, 1, 1)
+freezeBtn.Font = Enum.Font.GothamBold
+freezeBtn.TextSize = 12
+freezeBtn.Text = "FREEZE"
+freezeBtn.Parent = panel
+Instance.new("UICorner", freezeBtn).CornerRadius = UDim.new(0, 4)
 
 -------------------------------------------------
 -- VARIABLES
@@ -100,7 +113,7 @@ local ghostConnections = {}
 local mobileControls = nil
 
 local markedCFrame = nil
-local markedObjectInstance = nil -- Variabel untuk Object Mark (Persisten)
+local markedObjectInstance = nil 
 local tempMarkCFrame = nil
 local isUndoMode = false
 local undoThread = nil
@@ -122,6 +135,10 @@ local currentSearchTerm = ""
 local searchLoopConnection = nil
 
 local savedLabels = {}
+
+-- [NEW] Freeze Variables
+local isFreezeActive = false
+local freezeStates = {}
 
 -------------------------------------------------
 -- FUNCTIONS
@@ -209,10 +226,10 @@ end
 -- BUTTON CREATOR
 -------------------------------------------------
 
-local BTN_WIDTH = 75
+local BTN_WIDTH = 88
 local BTN_HEIGHT = 28
 local BTN_GAP = 5
-local START_X = 5
+local START_X = 3
 
 local function createButton(text, x, y, color)
 	local btn = Instance.new("TextButton")
@@ -385,7 +402,7 @@ end)
 
 local playerListPanel = Instance.new("Frame")
 playerListPanel.Name = "PlayerListPanel"
-playerListPanel.Size = UDim2.new(0, 520, 0, 300) -- Diperlebar sedikit untuk tambahan Line
+playerListPanel.Size = UDim2.new(0, 520, 0, 300) 
 playerListPanel.Position = UDim2.new(0.3, 0, 0.3, 0)
 playerListPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 playerListPanel.BackgroundTransparency = 0.1
@@ -454,8 +471,7 @@ headerFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 headerFrame.Parent = listContainer
 Instance.new("UICorner", headerFrame).CornerRadius = UDim.new(0, 4)
 
--- UPDATE: Tambah kolom "Line" (dari 6 jadi 7 kolom)
-local colWidths = {30, 100, 100, 55, 55, 55, 55} -- No, Name, NickName, Dist, TP, Cam, Line
+local colWidths = {30, 100, 100, 55, 55, 55, 55} 
 local headers = {"No", "Name", "NickName", "Dist", "TP", "Cam", "Line"}
 
 local xPos = 5
@@ -514,7 +530,7 @@ local markBtn = createMenuButton("Mark", 70, Color3.fromRGB(100, 0, 150))
 local deleteBtn = createMenuButton("Delete", 100, Color3.fromRGB(255, 0, 0))
 
 -------------------------------------------------
--- TOGGLE PIN & EVIL MODE
+-- TOGGLE PIN & EVIL MODE & [NEW] FREEZE MODE
 -------------------------------------------------
 
 pinBtn.MouseButton1Click:Connect(function()
@@ -541,6 +557,96 @@ evilBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- [NEW] FREEZE BUTTON LOGIC
+freezeBtn.MouseButton1Click:Connect(function()
+	if isFreezeActive then
+		-- OFF: Restore State
+		for obj, state in pairs(freezeStates) do
+			if obj and obj.Parent then
+				obj.Anchored = state.Anchored
+				obj.CustomPhysicalProperties = state.CustomPhysicalProperties
+				obj.TopSurface = state.Surfaces.Top
+				obj.BottomSurface = state.Surfaces.Bottom
+				obj.LeftSurface = state.Surfaces.Left
+				obj.RightSurface = state.Surfaces.Right
+				obj.FrontSurface = state.Surfaces.Front
+				obj.BackSurface = state.Surfaces.Back
+
+				for _, inst in ipairs(state.DisabledInstances) do
+					if inst and inst.Parent then
+						if inst:IsA("Constraint") then
+							inst.Enabled = true
+						end
+					end
+				end
+			end
+		end
+		freezeStates = {}
+		isFreezeActive = false
+		freezeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70) -- Grey
+		freezeBtn.Text = "FREEZE"
+		showRainbowNotification("Unfrozen")
+	else
+		-- ON: Freeze World
+		freezeStates = {}
+
+		for _, obj in ipairs(workspace:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				local model = obj:FindFirstAncestorOfClass("Model")
+				-- Skip Player/Humanoid
+				if not (model and model:FindFirstChildOfClass("Humanoid")) then
+
+					freezeStates[obj] = {
+						Anchored = obj.Anchored,
+						CustomPhysicalProperties = obj.CustomPhysicalProperties,
+						Surfaces = {
+							Top = obj.TopSurface,
+							Bottom = obj.BottomSurface,
+							Left = obj.LeftSurface,
+							Right = obj.RightSurface,
+							Front = obj.FrontSurface,
+							Back = obj.BackSurface,
+						},
+						DisabledInstances = {} 
+					}
+
+					-- Apply Freeze
+					obj.Anchored = true
+					obj.Velocity = Vector3.zero
+					obj.RotVelocity = Vector3.zero
+					obj.CustomPhysicalProperties = PhysicalProperties.new(0, 1, 0, 100, 100)
+
+					obj.TopSurface = Enum.SurfaceType.Studs
+					obj.BottomSurface = Enum.SurfaceType.Studs
+					obj.LeftSurface = Enum.SurfaceType.Studs
+					obj.RightSurface = Enum.SurfaceType.Studs
+					obj.FrontSurface = Enum.SurfaceType.Studs
+					obj.BackSurface = Enum.SurfaceType.Studs
+
+					-- Disable Constraints/Movers
+					for _, child in ipairs(obj:GetChildren()) do
+						if child:IsA("BodyMover") or child:IsA("Constraint") then
+							if child:IsA("Constraint") and child.Enabled then
+								table.insert(freezeStates[obj].DisabledInstances, child)
+								child.Enabled = false
+							elseif child:IsA("BodyMover") then
+								table.insert(freezeStates[obj].DisabledInstances, child)
+								child.Archivable = false
+								child:Destroy()
+							end
+						end
+					end
+				end
+			end
+		end
+
+		isFreezeActive = true
+		freezeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255) -- Blue/Active Color
+		freezeBtn.Text = "UNFREEZE"
+		showRainbowNotification("Frozen")
+	end
+end)
+
 -------------------------------------------------
 -- FITUR MINIMIZE
 -------------------------------------------------
@@ -548,7 +654,7 @@ end)
 minBtn.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	if isMinimized then
-		panel.Size = UDim2.new(0, 245, 0, 30)
+		panel.Size = UDim2.new(0, 280, 0, 30) -- Sesuaikan ukuran minimize
 		minBtn.Text = "+"
 		for _, btn in pairs(featureButtons) do btn.Visible = false end
 		cmdBox.Visible = false
@@ -895,7 +1001,7 @@ local function showLabelList()
 		end)
 
 		createSrBtn("Spec", Color3.fromRGB(60, 60, 60), function()
-			spectateObject(data, btn)
+			spectateObject(data, btn) -- Note: 'btn' here refers to context, passing generic button ref
 		end)
 
 		createSrBtn("Line", Color3.fromRGB(100, 100, 100), function()
@@ -1460,7 +1566,6 @@ local function toggleVision()
 		for _, label in pairs(objectLabels) do if label and label.Parent then label:Destroy() end end
 		objectLabels = {}
 		menu.Visible = false
-		-- PERBAIKAN: JANGAN hapus markedObjectInstance di sini agar bisa teleport meski vision off
 	end
 end
 
@@ -1541,7 +1646,6 @@ end)
 markBtn.MouseButton1Click:Connect(function()
 	if not selectedObject then return end
 
-	-- Hapus Mark lama jika berbeda object
 	if markedObjectInstance and markedObjectInstance ~= selectedObject then
 		if markedObjectInstance.Parent then
 			markedObjectInstance:SetAttribute("Marked", nil)
@@ -1549,11 +1653,10 @@ markBtn.MouseButton1Click:Connect(function()
 	end
 
 	markedObjectInstance = selectedObject
-	markedCFrame = nil -- Prioritaskan Object Mark
+	markedCFrame = nil 
 
 	selectedObject:SetAttribute("Marked", true)
 
-	-- Jika vision aktif, ubah warna. Jika tidak, tidak perlu (transparansi sudah normal)
 	if visionBtn:GetAttribute("Active") then
 		selectedObject.Color = Color3.fromRGB(0, 255, 255)
 	end
@@ -1582,7 +1685,7 @@ markingBtn.MouseButton1Click:Connect(function()
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
-	markedObjectInstance = nil -- Hapus Object Mark jika pakai Coordinate Mark
+	markedObjectInstance = nil 
 	markedCFrame = hrp.CFrame
 	markingBtn.Text = "Marked!"
 	markingBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
@@ -1597,15 +1700,12 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
-	-- GHOST MODE OVERRIDE
 	if ghostBtn:GetAttribute("Active") and ghostSphere then
 		handleAutoMarking()
 		hrp.CFrame = ghostSphere.CFrame + Vector3.new(0, 3, 0)
 		return
 	end
 
-	-- PERBAIKAN: PRIORITAS 1 adalah UNDO MODE
-	-- Ini harus dicek paling pertama agar bisa kembali ke posisi awal
 	if isUndoMode then
 		if tempMarkCFrame then
 			local currentLook = hrp.CFrame.LookVector
@@ -1616,20 +1716,17 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 		if undoThread then task.cancel(undoThread) end
 		tpMarkBtn.Text = "Teleport"
 		tpMarkBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 150)
-		return -- Hentikan eksekusi agar tidak lanjut ke logic object mark
+		return 
 	end
 
-	-- PRIORITAS 2: OBJECT MARK (Dinamis, bisa gerak)
-	-- Ini baru dijalankan jika TIDAK sedang dalam mode Undo
 	if markedObjectInstance and markedObjectInstance.Parent then
 		handleAutoMarking()
 
 		local pos = getObjectPosition(markedObjectInstance)
 		if pos then
-			tempMarkCFrame = hrp.CFrame -- Simpan posisi sekarang untuk undo
+			tempMarkCFrame = hrp.CFrame 
 			hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
 
-			-- Aktivasi Undo Mode
 			isUndoMode = true
 			tpMarkBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
 			if undoThread then task.cancel(undoThread) end
@@ -1652,7 +1749,6 @@ tpMarkBtn.MouseButton1Click:Connect(function()
 		return
 	end
 
-	-- PRIORITAS 3: COORDINATE MARK (Statis)
 	if not markedCFrame then
 		if autoMarkingActive then
 			markedCFrame = hrp.CFrame
@@ -1784,7 +1880,6 @@ local function createPlayerRow(plr, index)
 	distL.Parent = row
 	xPos = xPos + colWidths[4]
 
-	-- Tombol TP
 	local tpB = Instance.new("TextButton")
 	tpB.Size = UDim2.new(0, colWidths[5] - 8, 1, -4)
 	tpB.Position = UDim2.new(0, xPos + 4, 0, 2)
@@ -1819,7 +1914,6 @@ local function createPlayerRow(plr, index)
 	end)
 	xPos = xPos + colWidths[5]
 
-	-- Tombol Cam
 	local camB = Instance.new("TextButton")
 	camB.Size = UDim2.new(0, colWidths[6] - 8, 1, -4)
 	camB.Position = UDim2.new(0, xPos + 4, 0, 2)
@@ -1857,11 +1951,10 @@ local function createPlayerRow(plr, index)
 	end)
 	xPos = xPos + colWidths[6]
 
-	-- *** NEW: Tombol Line ***
 	local lineB = Instance.new("TextButton")
 	lineB.Size = UDim2.new(0, colWidths[7] - 8, 1, -4)
 	lineB.Position = UDim2.new(0, xPos + 4, 0, 2)
-	lineB.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Default abu-abu
+	lineB.BackgroundColor3 = Color3.fromRGB(100, 100, 100) 
 	lineB.Text = "Line"
 	lineB.TextColor3 = Color3.new(1, 1, 1)
 	lineB.Font = Enum.Font.GothamBold
@@ -1870,8 +1963,6 @@ local function createPlayerRow(plr, index)
 	Instance.new("UICorner", lineB).CornerRadius = UDim.new(0, 4)
 
 	lineB.MouseButton1Click:Connect(function()
-		-- Gunakan fungsi toggleLine yang sudah ada
-		-- Kirim player's character model sebagai target
 		if plr.Character then
 			toggleLine(plr.Character, lineB)
 		else
@@ -1879,18 +1970,16 @@ local function createPlayerRow(plr, index)
 		end
 	end)
 
-	-- Simpan semua referensi termasuk Line button
 	playerRows[plr] = {
 		Row = row, 
 		DistLabel = distL, 
 		CamBtn = camB, 
 		NameLabel = nameL, 
 		NickLabel = nickL,
-		LineBtn = lineB -- NEW: Simpan reference ke Line button
+		LineBtn = lineB 
 	}
 end
 
--- Update distance display
 RunService.RenderStepped:Connect(function()
 	local myChar = player.Character
 	if not myChar then return end
@@ -1909,7 +1998,6 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Search filter
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local text = string.lower(searchBox.Text)
 	for plr, data in pairs(playerRows) do
@@ -1924,15 +2012,10 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	scrollingFrame.CanvasPosition = Vector2.new(0, 0)
 end)
 
--- Initialize player list
 local function initPlayerList()
 	for _, data in pairs(playerRows) do 
 		if data.Row then 
 			data.Row:Destroy() 
-			-- Cleanup line jika ada saat destroy row
-			if data.LineBtn then
-				-- Reset line state jika perlu
-			end
 		end 
 	end
 	playerRows = {}
@@ -1951,14 +2034,12 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 end)
 
--- Handle player join/leave
 Players.PlayerAdded:Connect(function(plr) 
 	task.wait(1) 
 	initPlayerList() 
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
-	-- Cleanup line jika player keluar dan sedang aktif
 	if plr.Character and activeLines[plr.Character] then
 		toggleLine(plr.Character, playerRows[plr] and playerRows[plr].LineBtn)
 	end
